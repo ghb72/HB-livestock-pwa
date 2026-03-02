@@ -1,0 +1,38 @@
+# Conda environment for Livestock Register PWA
+# Manages both Python (backend) and Node.js (frontend) dependencies.
+#
+# Create:  conda env create -f environment.yml
+# Update:  conda env update -f environment.yml --prune
+# Activate: conda activate livestock
+
+name: livestock
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # ── Python runtime ──
+  - python=3.11
+
+  # ── Backend (FastAPI) ──
+  - pydantic=2.10.*
+  - httpx=0.28.*
+  - python-dotenv=1.0.*
+  - openpyxl=3.1.*
+  - bcrypt
+
+  # ── Google Sheets integration ──
+  - google-auth=2.*
+
+  # ── Node.js runtime (for frontend tooling; npm included) ──
+  - nodejs=22.*
+
+  # ── pip-only packages (not on conda-forge or need specific versions) ──
+  - pip
+  - pip:
+      - fastapi==0.115.6
+      - "uvicorn[standard]==0.34.0"
+      - gspread==6.1.4
+      - google-api-python-client==2.164.0
+      - "passlib[bcrypt]==1.7.4"
+      - "python-jose[cryptography]==3.3.0"
