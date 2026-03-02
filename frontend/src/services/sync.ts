@@ -12,7 +12,7 @@ import type { AnimalPhoto } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-/** Sync all pending local records with the server. */
+/** Sync all local and cloud records bidirectionally. */
 export async function syncAll(): Promise<{ synced: number; errors: number }> {
   if (!navigator.onLine) {
     return { synced: 0, errors: 0 };
@@ -24,7 +24,7 @@ export async function syncAll(): Promise<{ synced: number; errors: number }> {
   // Sync photos first so Drive URLs are available
   synced += await syncPhotos();
 
-  // Sync each table individually to avoid TS union issues
+  // Sync each table — always pushes pending AND pulls cloud state
   synced += await syncTable("animals", db.animals);
   synced += await syncTable("health", db.health);
   synced += await syncTable("reproduction", db.reproduction);
@@ -35,12 +35,17 @@ export async function syncAll(): Promise<{ synced: number; errors: number }> {
   return { synced, errors };
 }
 
-/** Sync a single table — push pending records and pull merged result. */
+/**
+ * Sync a single table — always contacts the server to push pending
+ * records AND pull the merged cloud state back.
+ *
+ * Even when there are no local pending records the server is called
+ * so that cloud-side changes (edits, deletions) are reflected locally.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function syncTable(name: string, table: Table<any, any>): Promise<number> {
   try {
     const pending = await table.where("_sync_status").equals("pending").toArray();
-    if (pending.length === 0) return 0;
 
     const response = await fetch(`${API_BASE}/api/sync/${name}`, {
       method: "POST",
@@ -52,6 +57,7 @@ async function syncTable(name: string, table: Table<any, any>): Promise<number> 
 
     const { merged } = (await response.json()) as { merged: Record<string, unknown>[] };
 
+    // Replace local table with the authoritative merged dataset
     await db.transaction("rw", table, async () => {
       await table.clear();
       await table.bulkAdd(merged);
