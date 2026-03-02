@@ -57,9 +57,22 @@ npm run dev
 
 ## Production Deployment
 
-- **Frontend**: deploy `frontend/` to Vercel
-- **Backend**: deploy to Render Web Service using `pip` and `render.yaml`
-- **Render deps**: `backend/requirements-render.txt`
+- **Frontend (Vercel)**: uses root `vercel.json` (builds `frontend/`)
+- **Backend (Render)**: uses root `render.yaml` with `rootDir: backend`
+- **Backend deps**: `backend/requirements-render.txt`
+
+### Deploy both from the same GitHub repository
+
+1. Connect this repository in **Render** and create a Blueprint service
+	from `render.yaml`.
+2. In Render service settings, add:
+	- `GOOGLE_SHEETS_SPREADSHEET_ID`
+	- Secret file mounted at `/etc/secrets/credentials.json`
+3. Connect the same repository in **Vercel**.
+	`vercel.json` will build and publish `frontend/dist`.
+4. In Vercel project environment variables, set:
+	- `VITE_API_URL=https://<your-render-service>.onrender.com`
+5. Redeploy both services after env vars are configured.
 
 ## License
 
