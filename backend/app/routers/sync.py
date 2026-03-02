@@ -23,8 +23,8 @@ def _safe_read(table_name: str) -> list[dict]:
     """Read a sheet table, returning empty list if credentials missing."""
     try:
         return read_sheet(table_name)
-    except (FileNotFoundError, ValueError) as e:
-        logger.warning("Sheets unavailable for '%s': %s", table_name, e)
+    except Exception as e:
+        logger.warning("Sheets unavailable for '%s': %s — %s", table_name, type(e).__name__, e)
         return []
 
 
@@ -57,9 +57,11 @@ async def sync_table(table_name: str, request: SyncRequest):
             server_count=0,
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Sync failed: {str(e)}",
+        logger.warning("Sheets error on sync '%s': %s — %s", table_name, type(e).__name__, e)
+        return SyncResponse(
+            merged=request.records,
+            synced_count=0,
+            server_count=0,
         )
 
 
