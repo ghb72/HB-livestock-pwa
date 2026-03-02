@@ -6,14 +6,26 @@ Endpoints:
     GET  /api/sync/pull          — Pull all data from Google Sheets
 """
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from ..models import PullResponse, SyncRequest, SyncResponse
 from ..services.sheets import merge_records, read_sheet
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 VALID_TABLES = {"animals", "health", "reproduction", "observations", "sales", "recorridos"}
+
+
+def _safe_read(table_name: str) -> list[dict]:
+    """Read a sheet table, returning empty list if credentials missing."""
+    try:
+        return read_sheet(table_name)
+    except (FileNotFoundError, ValueError) as e:
+        logger.warning("Sheets unavailable for '%s': %s", table_name, e)
+        return []
 
 
 @router.post("/{table_name}", response_model=SyncResponse)
@@ -36,8 +48,14 @@ async def sync_table(table_name: str, request: SyncRequest):
             synced_count=len(request.records),
             server_count=len(merged),
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except (FileNotFoundError, ValueError) as e:
+        logger.warning("Sheets unavailable for sync '%s': %s", table_name, e)
+        # Return the client records as-is so nothing is lost
+        return SyncResponse(
+            merged=request.records,
+            synced_count=0,
+            server_count=0,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -51,18 +69,13 @@ async def pull_all():
     Pull all data from Google Sheets.
 
     Used for initial load or manual refresh from cloud.
+    Returns empty data if Google Sheets credentials are not configured.
     """
-    try:
-        return PullResponse(
-            animals=read_sheet("animals"),
-            health=read_sheet("health"),
-            reproduction=read_sheet("reproduction"),
-            observations=read_sheet("observations"),
-            sales=read_sheet("sales"),
-            recorridos=read_sheet("recorridos"),
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Pull failed: {str(e)}",
-        )
+    return PullResponse(
+        animals=_safe_read("animals"),
+        health=_safe_read("health"),
+        reproduction=_safe_read("reproduction"),
+        observations=_safe_read("observations"),
+        sales=_safe_read("sales"),
+        recorridos=_safe_read("recorridos"),
+    )
