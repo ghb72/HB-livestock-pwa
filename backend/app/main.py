@@ -8,6 +8,8 @@ Usage:
     uvicorn backend.app.main:app --reload --port 8000
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,13 +22,16 @@ app = FastAPI(
 )
 
 # CORS — allow PWA frontend (dev + production)
+_extra_origins = os.getenv("CORS_ORIGINS", "").split(",")
+_origins = [
+    "http://localhost:5173",              # Vite dev server
+    "http://localhost:4173",              # Vite preview
+    "https://ganadolaescondida.vercel.app",  # Production frontend
+] + [o.strip() for o in _extra_origins if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:4173",   # Vite preview
-        "https://*.vercel.app",    # Production frontend
-    ],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
