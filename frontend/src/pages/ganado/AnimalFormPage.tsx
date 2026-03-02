@@ -155,7 +155,7 @@ export default function AnimalFormPage() {
         }
       } else {
         // Create new
-        const animalId = await generateId("ANI", db.animals);
+        const animalId = `${form.nombre}-${form.arete_id}`;
         const newAnimal: Animal = {
           animal_id: animalId,
           ...form,
