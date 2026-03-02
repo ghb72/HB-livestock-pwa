@@ -116,22 +116,22 @@ def write_sheet(table_name: str, records: list[dict]) -> None:
     spreadsheet = get_spreadsheet()
     worksheet = spreadsheet.worksheet(sheet_name)
 
-    if not records:
-        if worksheet.row_count > 1:
-            worksheet.delete_rows(2, worksheet.row_count)
-        return
-
     headers = worksheet.row_values(1)
     if not headers:
+        return
+
+    # Clear all data below the header row
+    last_col = chr(ord("A") + len(headers) - 1)
+    data_range = f"A2:{last_col}{max(worksheet.row_count, 2)}"
+    worksheet.batch_clear([data_range])
+
+    if not records:
         return
 
     rows = []
     for record in records:
         row = [str(record.get(h, "")) for h in headers]
         rows.append(row)
-
-    if worksheet.row_count > 1:
-        worksheet.delete_rows(2, worksheet.row_count)
 
     if rows:
         worksheet.append_rows(rows, value_input_option="USER_ENTERED")
