@@ -55,23 +55,23 @@ def create_registro_sheet(wb: openpyxl.Workbook) -> None:
     ws.title = "Registro"
 
     headers = [
-        "Animal_ID",
-        "No. Arete (ID)",
-        "Nombre",
-        "Tipo",
-        "Sexo",
-        "Fecha Nacimiento",
-        "Raza",
-        "Madre ID",
-        "Padre ID",
-        "Temperamento",
-        "Estado",
-        "Peso Actual (kg)",
-        "Notas",
-        "Foto URL",
-        "Creado Por",
-        "Actualizado",
-        "Creado",
+        "animal_id",
+        "arete_id",
+        "nombre",
+        "tipo",
+        "sexo",
+        "fecha_nacimiento",
+        "raza",
+        "madre_id",
+        "padre_id",
+        "temperamento",
+        "estado",
+        "peso_actual",
+        "notas",
+        "foto_url",
+        "created_by",
+        "updated_at",
+        "created_at",
     ]
     widths = [12, 15, 15, 14, 10, 18, 15, 12, 12, 14, 14, 18, 30, 20, 12, 20, 20]
 
@@ -116,18 +116,18 @@ def create_salud_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Salud")
 
     headers = [
-        "Salud_ID",
-        "Animal_ID",
-        "Fecha",
-        "Tipo Evento",
-        "Producto",
-        "Dosis",
-        "Estado General",
-        "Próxima Aplicación",
-        "Notas",
-        "Creado Por",
-        "Actualizado",
-        "Creado",
+        "salud_id",
+        "animal_id",
+        "fecha",
+        "tipo_evento",
+        "producto",
+        "dosis",
+        "estado_general",
+        "proxima_aplicacion",
+        "notas",
+        "created_by",
+        "updated_at",
+        "created_at",
     ]
     widths = [12, 12, 14, 18, 20, 12, 16, 20, 30, 12, 20, 20]
 
@@ -155,19 +155,19 @@ def create_reproduccion_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Reproduccion")
 
     headers = [
-        "Reproduccion_ID",
-        "Vaca_ID",
-        "Semental_ID",
-        "Fecha Monta",
-        "Fecha Posible Parto",
-        "Preñez Confirmada",
-        "Fecha Parto Real",
-        "Cría_ID",
-        "Peso Destete Cría (kg)",
-        "Notas",
-        "Creado Por",
-        "Actualizado",
-        "Creado",
+        "reproduccion_id",
+        "vaca_id",
+        "semental_id",
+        "fecha_monta",
+        "fecha_posible_parto",
+        "prenez_confirmada",
+        "fecha_parto_real",
+        "cria_id",
+        "peso_destete_cria",
+        "notas",
+        "created_by",
+        "updated_at",
+        "created_at",
     ]
     widths = [18, 12, 14, 16, 20, 18, 18, 12, 22, 30, 12, 20, 20]
 
@@ -187,13 +187,13 @@ def create_observaciones_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Observaciones")
 
     headers = [
-        "Observacion_ID",
-        "Fecha",
-        "Animal_ID",
-        "Notas",
-        "Creado Por",
-        "Actualizado",
-        "Creado",
+        "observacion_id",
+        "fecha",
+        "animal_id",
+        "notas",
+        "created_by",
+        "updated_at",
+        "created_at",
     ]
     widths = [18, 14, 12, 40, 12, 20, 20]
 
@@ -205,18 +205,18 @@ def create_ventas_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Ventas")
 
     headers = [
-        "Venta_ID",
-        "Animal_ID",
-        "Fecha Venta",
-        "Motivo de Venta",
-        "Peso (kg)",
-        "Precio Total ($)",
-        "Precio por kg ($/kg)",
-        "Comprador",
-        "Notas",
-        "Creado Por",
-        "Actualizado",
-        "Creado",
+        "venta_id",
+        "animal_id",
+        "fecha_venta",
+        "motivo_venta",
+        "peso",
+        "precio_total",
+        "precio_kg",
+        "comprador",
+        "notas",
+        "created_by",
+        "updated_at",
+        "created_at",
     ]
     widths = [12, 12, 14, 20, 12, 16, 18, 18, 30, 12, 20, 20]
 
@@ -236,13 +236,13 @@ def create_recorridos_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Recorridos")
 
     headers = [
-        "Recorrido_ID",
-        "Fecha",
-        "Animal_ID",
-        "Notas",
-        "Creado Por",
-        "Actualizado",
-        "Creado",
+        "recorrido_id",
+        "fecha",
+        "animal_id",
+        "notas",
+        "created_by",
+        "updated_at",
+        "created_at",
     ]
     widths = [18, 14, 12, 40, 12, 20, 20]
 
@@ -254,10 +254,10 @@ def create_usuarios_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Usuarios")
 
     headers = [
-        "User_ID",
-        "Nombre",
-        "PIN (hash)",
-        "Creado",
+        "user_id",
+        "nombre",
+        "pin_hash",
+        "created_at",
     ]
     widths = [12, 20, 40, 20]
 
