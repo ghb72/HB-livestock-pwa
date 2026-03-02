@@ -231,6 +231,24 @@ def create_ventas_sheet(wb: openpyxl.Workbook) -> None:
     motivo_dv.add(f"D2:D1000")
 
 
+def create_recorridos_sheet(wb: openpyxl.Workbook) -> None:
+    """Create the 'Recorridos' sheet for field patrol records."""
+    ws = wb.create_sheet("Recorridos")
+
+    headers = [
+        "Recorrido_ID",
+        "Fecha",
+        "Animal_ID",
+        "Notas",
+        "Creado Por",
+        "Actualizado",
+        "Creado",
+    ]
+    widths = [18, 14, 12, 40, 12, 20, 20]
+
+    apply_headers(ws, headers, widths)
+
+
 def create_usuarios_sheet(wb: openpyxl.Workbook) -> None:
     """Create the 'Usuarios' sheet for user management."""
     ws = wb.create_sheet("Usuarios")
@@ -259,6 +277,7 @@ def main() -> None:
     create_reproduccion_sheet(wb)
     create_observaciones_sheet(wb)
     create_ventas_sheet(wb)
+    create_recorridos_sheet(wb)
     create_usuarios_sheet(wb)
 
     wb.save(output_path)
