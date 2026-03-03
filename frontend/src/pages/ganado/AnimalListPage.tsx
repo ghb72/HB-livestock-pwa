@@ -38,12 +38,15 @@ export default function AnimalListPage() {
     let query = db.animals.orderBy("nombre");
 
     const all = await query.toArray();
+    const normalizedSearch = search.toLowerCase();
 
     return all.filter((a) => {
+      const nombre = String(a.nombre ?? "").toLowerCase();
+      const areteId = String(a.arete_id ?? "").toLowerCase();
       const matchSearch =
-        !search ||
-        a.nombre.toLowerCase().includes(search.toLowerCase()) ||
-        a.arete_id.toLowerCase().includes(search.toLowerCase());
+        !normalizedSearch ||
+        nombre.includes(normalizedSearch) ||
+        areteId.includes(normalizedSearch);
       const matchTipo = !filterTipo || a.tipo === filterTipo;
       return matchSearch && matchTipo;
     });
