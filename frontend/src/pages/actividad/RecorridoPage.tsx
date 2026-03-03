@@ -81,7 +81,7 @@ export default function RecorridoPage() {
     setSaving(true);
 
     try {
-      const recorridoId = await generateId("REC", db.recorridos);
+      const recorridoId = generateId("REC");
       const timestamp = now();
       const userId = currentUserId();
 

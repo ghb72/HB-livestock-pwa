@@ -5,6 +5,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { db } from "../../db";
 import { generateId, now, currentUserId } from "../../db/helpers";
 import { FormField, SelectField, PhotoCapture } from "../../components/ui";
+import type { AnimalPhoto } from "../../types";
 import type {
   Animal,
   AnimalTipo,
@@ -117,70 +118,71 @@ export default function AnimalFormPage() {
       const userId = currentUserId();
 
       if (isEdit && id) {
-        // Update existing
-        await db.animals.update(id, {
-          ...form,
-          peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
-          madre_id: form.madre_id.split(" - ")[0] ?? form.madre_id,
-          padre_id: form.padre_id.split(" - ")[0] ?? form.padre_id,
-          updated_at: timestamp,
-          _sync_status: "pending",
-        });
+        // Update existing — single transaction for animal + photo
+        await db.transaction("rw", db.animals, db.photos, async () => {
+          await db.animals.update(id, {
+            ...form,
+            peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
+            madre_id: form.madre_id.split(" - ")[0] ?? form.madre_id,
+            padre_id: form.padre_id.split(" - ")[0] ?? form.padre_id,
+            updated_at: timestamp,
+            _sync_status: "pending",
+          });
 
-        // Update or create photo
-        if (photoData && photoData.startsWith("data:")) {
-          const existingPhotoRec = await db.photos
-            .where("animal_id")
-            .equals(id)
-            .first();
-          if (existingPhotoRec) {
-            await db.photos.update(existingPhotoRec.photo_id, {
-              data_url: photoData,
-              _sync_status: "pending",
-            });
-          } else {
-            const photoId = await generateId("PHT", db.photos);
+          if (photoData && photoData.startsWith("data:")) {
+            const existingPhotoRec = await db.photos
+              .where("animal_id")
+              .equals(id)
+              .first();
+            if (existingPhotoRec) {
+              await db.photos.update(existingPhotoRec.photo_id, {
+                data_url: photoData,
+                _sync_status: "pending",
+              });
+            } else {
+              const photoId = generateId("PHT");
+              await db.photos.add({
+                photo_id: photoId,
+                animal_id: id,
+                data_url: photoData,
+                drive_url: "",
+                _sync_status: "pending",
+                created_at: timestamp,
+              } as AnimalPhoto);
+            }
+          } else if (!photoData) {
+            await db.photos.where("animal_id").equals(id).delete();
+          }
+        });
+      } else {
+        // Create new — single transaction for animal + photo
+        const animalId = `${form.nombre}-${form.arete_id}`;
+        await db.transaction("rw", db.animals, db.photos, async () => {
+          const newAnimal: Animal = {
+            animal_id: animalId,
+            ...form,
+            peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
+            madre_id: form.madre_id.split(" - ")[0] ?? form.madre_id,
+            padre_id: form.padre_id.split(" - ")[0] ?? form.padre_id,
+            created_by: userId,
+            updated_at: timestamp,
+            created_at: timestamp,
+            _sync_status: "pending",
+          };
+          await db.animals.add(newAnimal);
+
+          if (photoData && photoData.startsWith("data:")) {
+            const photoId = generateId("PHT");
             await db.photos.add({
               photo_id: photoId,
-              animal_id: id,
+              animal_id: animalId,
               data_url: photoData,
               drive_url: "",
               _sync_status: "pending",
               created_at: timestamp,
-            });
+            } as AnimalPhoto);
           }
-        } else if (!photoData) {
-          // Photo removed
-          await db.photos.where("animal_id").equals(id).delete();
-        }
-      } else {
-        // Create new
-        const animalId = `${form.nombre}-${form.arete_id}`;
-        const newAnimal: Animal = {
-          animal_id: animalId,
-          ...form,
-          peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
-          madre_id: form.madre_id.split(" - ")[0] ?? form.madre_id,
-          padre_id: form.padre_id.split(" - ")[0] ?? form.padre_id,
-          created_by: userId,
-          updated_at: timestamp,
-          created_at: timestamp,
-          _sync_status: "pending",
-        };
-        await db.animals.add(newAnimal);
-
-        // Save photo if captured
-        if (photoData && photoData.startsWith("data:")) {
-          const photoId = await generateId("PHT", db.photos);
-          await db.photos.add({
-            photo_id: photoId,
-            animal_id: animalId,
-            data_url: photoData,
-            drive_url: "",
-            _sync_status: "pending",
-            created_at: timestamp,
-          });
-        }
+        });
       }
 
       navigate("/ganado", { replace: true });

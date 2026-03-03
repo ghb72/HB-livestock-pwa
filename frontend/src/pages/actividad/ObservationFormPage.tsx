@@ -40,7 +40,7 @@ export default function ObservationFormPage() {
 
     try {
       const timestamp = now();
-      const obsId = await generateId("OBS", db.observations);
+      const obsId = generateId("OBS");
 
       const record: Observation = {
         observacion_id: obsId,
