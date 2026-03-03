@@ -1,11 +1,28 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Plus, Beef, AlertTriangle } from "lucide-react";
+import { Plus, Beef, AlertTriangle, ArrowUpDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { db } from "../../db";
 import { SearchBar, Card, StatusBadge, EmptyState } from "../../components/ui";
 import { useMissingAnimals } from "../../hooks/useMissingAnimals";
 import type { Animal, AnimalTipo } from "../../types";
+
+type SortOption =
+  | "nombre_asc"
+  | "nombre_desc"
+  | "reciente"
+  | "antiguo"
+  | "edad_desc"
+  | "edad_asc";
+
+const SORT_LABELS: Record<SortOption, string> = {
+  nombre_asc: "Nombre A→Z",
+  nombre_desc: "Nombre Z→A",
+  reciente: "Más nuevo",
+  antiguo: "Más antiguo",
+  edad_desc: "Mayor edad",
+  edad_asc: "Menor edad",
+};
 
 const TIPO_FILTERS: AnimalTipo[] = [
   "Vaca",
@@ -21,7 +38,7 @@ const TIPO_FILTERS: AnimalTipo[] = [
 export default function AnimalListPage() {
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState<string>("");
-  const [filterCreatedAt, setFilterCreatedAt] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("reciente");
   const navigate = useNavigate();
   const { missingIds } = useMissingAnimals();
 
@@ -36,24 +53,40 @@ export default function AnimalListPage() {
   }) ?? new Map<string, string>();
 
   const animals = useLiveQuery(async () => {
-    let query = db.animals.orderBy("nombre");
-
-    const all = await query.toArray();
+    const all = await db.animals.toArray();
     const normalizedSearch = search.toLowerCase();
 
-    return all.filter((a) => {
+    const filtered = all.filter((a) => {
       const nombre = String(a.nombre ?? "").toLowerCase();
       const areteId = String(a.arete_id ?? "").toLowerCase();
-      const createdDate = String(a.created_at ?? "").slice(0, 10);
       const matchSearch =
         !normalizedSearch ||
         nombre.includes(normalizedSearch) ||
         areteId.includes(normalizedSearch);
       const matchTipo = !filterTipo || a.tipo === filterTipo;
-      const matchCreatedAt = !filterCreatedAt || createdDate === filterCreatedAt;
-      return matchSearch && matchTipo && matchCreatedAt;
+      return matchSearch && matchTipo;
     });
-  }, [search, filterTipo, filterCreatedAt]);
+
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "nombre_asc":
+          return String(a.nombre ?? "").localeCompare(String(b.nombre ?? ""), "es");
+        case "nombre_desc":
+          return String(b.nombre ?? "").localeCompare(String(a.nombre ?? ""), "es");
+        case "reciente":
+          return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+        case "antiguo":
+          return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+        case "edad_desc":
+          // oldest birth date first = greatest age
+          return String(a.fecha_nacimiento ?? "").localeCompare(String(b.fecha_nacimiento ?? ""));
+        case "edad_asc":
+          return String(b.fecha_nacimiento ?? "").localeCompare(String(a.fecha_nacimiento ?? ""));
+        default:
+          return 0;
+      }
+    });
+  }, [search, filterTipo, sortBy]);
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -72,23 +105,18 @@ export default function AnimalListPage() {
       {/* Search */}
       <SearchBar value={search} onChange={setSearch} />
 
-      {/* Registration date filter */}
+      {/* Sort control */}
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-500">Fecha registro</span>
-        <input
-          type="date"
-          value={filterCreatedAt}
-          onChange={(e) => setFilterCreatedAt(e.target.value)}
-          className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-green-500"
-        />
-        {filterCreatedAt && (
-          <button
-            onClick={() => setFilterCreatedAt("")}
-            className="rounded-lg bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-600"
-          >
-            Limpiar
-          </button>
-        )}
+        <ArrowUpDown size={14} className="shrink-0 text-gray-400" />
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className="flex-1 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-green-500"
+        >
+          {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Type filters */}
