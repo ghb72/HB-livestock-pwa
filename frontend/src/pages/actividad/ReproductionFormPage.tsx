@@ -60,7 +60,7 @@ export default function ReproductionFormPage() {
 
     try {
       const timestamp = now();
-      const reproId = await generateId("REP", db.reproduction);
+      const reproId = generateId("REP");
 
       const record: ReproductionRecord = {
         reproduccion_id: reproId,

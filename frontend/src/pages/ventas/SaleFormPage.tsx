@@ -57,7 +57,7 @@ export default function SaleFormPage() {
 
     try {
       const timestamp = now();
-      const ventaId = await generateId("VTA", db.sales);
+      const ventaId = generateId("VTA");
       const animalId = form.animal_id.split(" - ")[0];
 
       const record: Sale = {
@@ -76,13 +76,14 @@ export default function SaleFormPage() {
         _sync_status: "pending",
       };
 
-      await db.sales.add(record);
-
-      // Mark the animal as "Vendido(a)"
-      await db.animals.update(animalId, {
-        estado: "Vendido(a)",
-        updated_at: timestamp,
-        _sync_status: "pending",
+      // Single transaction: add sale + mark animal as sold
+      await db.transaction("rw", db.sales, db.animals, async () => {
+        await db.sales.add(record);
+        await db.animals.update(animalId, {
+          estado: "Vendido(a)",
+          updated_at: timestamp,
+          _sync_status: "pending",
+        });
       });
 
       navigate("/ventas", { replace: true });
