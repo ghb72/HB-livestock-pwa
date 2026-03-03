@@ -61,7 +61,7 @@ export default function HealthFormPage() {
 
     try {
       const timestamp = now();
-      const saludId = await generateId("SAL", db.health);
+      const saludId = generateId("SAL");
 
       const record: HealthRecord = {
         salud_id: saludId,

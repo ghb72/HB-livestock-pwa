@@ -2,21 +2,17 @@
  * Database helper utilities for ID generation and timestamps.
  */
 
-import type { Table } from "dexie";
-
 /**
- * Generate a sequential ID with a given prefix.
+ * Generate a unique ID with a given prefix using crypto.randomUUID.
  *
- * Example: generateId("ANI", db.animals) → "ANI-042"
+ * Example: generateId("SAL") → "SAL-a1b2c3d4"
+ *
+ * Takes the first 8 hex chars of a UUID v4 for a short, unique key.
+ * No database scan required — O(1) and synchronous-safe.
  */
-export async function generateId(
-  prefix: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  table: Table<any, any>,
-): Promise<string> {
-  const count = await table.count();
-  const next = count + 1;
-  return `${prefix}-${String(next).padStart(3, "0")}`;
+export function generateId(prefix: string): string {
+  const uuid = crypto.randomUUID().replace(/-/g, "");
+  return `${prefix}-${uuid.slice(0, 8)}`;
 }
 
 /** Current ISO 8601 timestamp. */
