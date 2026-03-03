@@ -80,6 +80,25 @@ export class LivestockDB extends Dexie {
       users:
         "user_id, nombre",
     });
+
+    this.version(4).stores({
+      animals:
+        "animal_id, arete_id, nombre, madre_id, padre_id, tipo, sexo, estado, _sync_status",
+      health:
+        "salud_id, animal_id, fecha, tipo_evento, _sync_status",
+      reproduction:
+        "reproduccion_id, vaca_id, semental_id, fecha_monta, _sync_status",
+      observations:
+        "observacion_id, animal_id, fecha, _sync_status",
+      sales:
+        "venta_id, animal_id, fecha_venta, _sync_status",
+      recorridos:
+        "++_rowId, recorrido_id, fecha, animal_id, _sync_status",
+      photos:
+        "photo_id, animal_id, _sync_status",
+      users:
+        "user_id, nombre",
+    });
   }
 }
 
