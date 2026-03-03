@@ -21,6 +21,7 @@ const TIPO_FILTERS: AnimalTipo[] = [
 export default function AnimalListPage() {
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState<string>("");
+  const [filterCreatedAt, setFilterCreatedAt] = useState("");
   const navigate = useNavigate();
   const { missingIds } = useMissingAnimals();
 
@@ -43,14 +44,16 @@ export default function AnimalListPage() {
     return all.filter((a) => {
       const nombre = String(a.nombre ?? "").toLowerCase();
       const areteId = String(a.arete_id ?? "").toLowerCase();
+      const createdDate = String(a.created_at ?? "").slice(0, 10);
       const matchSearch =
         !normalizedSearch ||
         nombre.includes(normalizedSearch) ||
         areteId.includes(normalizedSearch);
       const matchTipo = !filterTipo || a.tipo === filterTipo;
-      return matchSearch && matchTipo;
+      const matchCreatedAt = !filterCreatedAt || createdDate === filterCreatedAt;
+      return matchSearch && matchTipo && matchCreatedAt;
     });
-  }, [search, filterTipo]);
+  }, [search, filterTipo, filterCreatedAt]);
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -68,6 +71,25 @@ export default function AnimalListPage() {
 
       {/* Search */}
       <SearchBar value={search} onChange={setSearch} />
+
+      {/* Registration date filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">Fecha registro</span>
+        <input
+          type="date"
+          value={filterCreatedAt}
+          onChange={(e) => setFilterCreatedAt(e.target.value)}
+          className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-green-500"
+        />
+        {filterCreatedAt && (
+          <button
+            onClick={() => setFilterCreatedAt("")}
+            className="rounded-lg bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-600"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
 
       {/* Type filters */}
       <div className="flex gap-2 overflow-x-auto pb-1">
