@@ -1,5 +1,5 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { HeartPulse, Baby, Eye, Plus, MapPin } from "lucide-react";
+import { HeartPulse, Baby, Eye, Plus, MapPin, ClipboardList } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -89,8 +89,16 @@ export default function ActivityPage() {
           <Link
             to="/actividad/salud/nuevo"
             className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
+            title="Evento masivo"
           >
-            <Plus size={14} /> Salud
+            <ClipboardList size={14} /> Salud
+          </Link>
+          <Link
+            to="/actividad/salud/individual"
+            className="flex items-center gap-1 rounded-lg bg-blue-400 px-3 py-2 text-xs font-semibold text-white"
+            title="Evento individual"
+          >
+            <Plus size={14} /> 1 Salud
           </Link>
           <Link
             to="/actividad/reproduccion/nuevo"

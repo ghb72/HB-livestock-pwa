@@ -7,6 +7,7 @@ import AnimalFormPage from "../pages/ganado/AnimalFormPage";
 import AnimalDetailPage from "../pages/ganado/AnimalDetailPage";
 import ActivityPage from "../pages/actividad/ActivityPage";
 import HealthFormPage from "../pages/actividad/HealthFormPage";
+import BatchHealthPage from "../pages/actividad/BatchHealthPage";
 import ReproductionFormPage from "../pages/actividad/ReproductionFormPage";
 import ObservationFormPage from "../pages/actividad/ObservationFormPage";
 import RecorridoPage from "../pages/actividad/RecorridoPage";
@@ -36,7 +37,8 @@ export const router = createBrowserRouter([
 
       // Actividad
       { path: "actividad", element: <ActivityPage /> },
-      { path: "actividad/salud/nuevo", element: <HealthFormPage /> },
+      { path: "actividad/salud/nuevo", element: <BatchHealthPage /> },
+      { path: "actividad/salud/individual", element: <HealthFormPage /> },
       { path: "actividad/reproduccion/nuevo", element: <ReproductionFormPage /> },
       { path: "actividad/observacion/nuevo", element: <ObservationFormPage /> },
       { path: "actividad/recorridos", element: <RecorridoListPage /> },
