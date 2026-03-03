@@ -51,6 +51,52 @@ export default function AnimalDetailPage() {
     [id],
   );
 
+  const offspringSummary = useLiveQuery(async () => {
+    if (!id) {
+      return { count: 0, list: [] as { animal_id: string; nombre: string; arete_id: string }[] };
+    }
+
+    const [calvesByMother, birthRecords] = await Promise.all([
+      db.animals.where("madre_id").equals(id).toArray(),
+      db.reproduction.where("vaca_id").equals(id).toArray(),
+    ]);
+
+    const byId = new Map<string, { animal_id: string; nombre: string; arete_id: string }>();
+
+    for (const calf of calvesByMother) {
+      byId.set(calf.animal_id, {
+        animal_id: calf.animal_id,
+        nombre: calf.nombre || "Sin nombre",
+        arete_id: String(calf.arete_id ?? ""),
+      });
+    }
+
+    for (const birth of birthRecords) {
+      const calfId = String(birth.cria_id ?? "").trim();
+      if (!calfId || byId.has(calfId)) continue;
+
+      const calf = await db.animals.get(calfId);
+      if (calf) {
+        byId.set(calf.animal_id, {
+          animal_id: calf.animal_id,
+          nombre: calf.nombre || "Sin nombre",
+          arete_id: String(calf.arete_id ?? ""),
+        });
+      } else {
+        byId.set(calfId, {
+          animal_id: calfId,
+          nombre: calfId,
+          arete_id: "",
+        });
+      }
+    }
+
+    return {
+      count: byId.size,
+      list: Array.from(byId.values()),
+    };
+  }, [id]);
+
   const observations = useLiveQuery(
     () =>
       id
@@ -218,6 +264,26 @@ export default function AnimalDetailPage() {
           />
           <Detail label="Registrado" value={formatDate(animal.created_at)} />
         </div>
+
+        {animal.tipo === "Vaca" && (
+          <div className="mt-4 rounded-lg bg-gray-50 p-3">
+            <p className="text-xs text-gray-400">Crías registradas</p>
+            <p className="text-sm font-semibold text-gray-700">
+              {offspringSummary?.count ?? 0}
+            </p>
+            {offspringSummary && offspringSummary.count > 0 && (
+              <ul className="mt-2 space-y-1 text-xs text-gray-600">
+                {offspringSummary.list.slice(0, 4).map((calf) => (
+                  <li key={calf.animal_id} className="truncate">
+                    {calf.nombre}
+                    {calf.arete_id ? ` (#${calf.arete_id})` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {animal.notas && (
           <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
             {animal.notas}
