@@ -7,6 +7,7 @@ import {
   MapPin,
   ClipboardList,
   Check,
+  CalendarDays,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -146,6 +147,12 @@ export default function ActivityPage() {
             className="flex items-center gap-1 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white"
           >
             <MapPin size={14} /> Recorridos
+          </Link>
+          <Link
+            to="/actividad/calendario-reproductivo"
+            className="flex items-center gap-1 rounded-lg bg-pink-700 px-3 py-2 text-xs font-semibold text-white"
+          >
+            <CalendarDays size={14} /> Repro
           </Link>
           <Link
             to="/actividad/salud/nuevo"
