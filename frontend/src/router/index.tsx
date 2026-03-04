@@ -9,6 +9,7 @@ import ActivityPage from "../pages/actividad/ActivityPage";
 import HealthFormPage from "../pages/actividad/HealthFormPage";
 import BatchHealthPage from "../pages/actividad/BatchHealthPage";
 import ReproductionFormPage from "../pages/actividad/ReproductionFormPage";
+import ReproductiveCalendarPage from "../pages/actividad/ReproductiveCalendarPage";
 import ObservationFormPage from "../pages/actividad/ObservationFormPage";
 import RecorridoPage from "../pages/actividad/RecorridoPage";
 import RecorridoListPage from "../pages/actividad/RecorridoListPage";
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
       { path: "actividad/recorridos", element: <RecorridoListPage /> },
       { path: "actividad/recorrido/nuevo", element: <RecorridoPage /> },
       { path: "actividad/recorrido/:id", element: <RecorridoDetailPage /> },
+      { path: "actividad/calendario-reproductivo", element: <ReproductiveCalendarPage /> },
 
       // Ventas
       { path: "ventas", element: <SalesListPage /> },
