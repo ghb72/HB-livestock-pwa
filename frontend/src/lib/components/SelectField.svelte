@@ -1,10 +1,12 @@
 <script lang="ts">
+	type SelectOption = string | { value: string; label: string };
+
 	interface Props {
 		label: string;
 		name: string;
 		value: string;
 		onchange: (value: string) => void;
-		options: readonly string[];
+		options: readonly SelectOption[];
 		placeholder?: string;
 		required?: boolean;
 	}
@@ -18,6 +20,14 @@
 		placeholder = 'Seleccionar...',
 		required = false
 	}: Props = $props();
+
+	function getOptionValue(option: SelectOption) {
+		return typeof option === 'string' ? option : option.value;
+	}
+
+	function getOptionLabel(option: SelectOption) {
+		return typeof option === 'string' ? option : option.label;
+	}
 </script>
 
 <div class="space-y-1">
@@ -35,7 +45,7 @@
 	>
 		<option value="">{placeholder}</option>
 		{#each options as opt}
-			<option value={opt}>{opt}</option>
+			<option value={getOptionValue(opt)}>{getOptionLabel(opt)}</option>
 		{/each}
 	</select>
 </div>

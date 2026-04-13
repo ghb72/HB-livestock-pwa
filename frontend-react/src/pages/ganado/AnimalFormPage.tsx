@@ -25,6 +25,11 @@ const SEXOS: Sexo[] = ["Macho", "Hembra"];
 const TEMPERAMENTOS: Temperamento[] = ["Normal", "Manso(a)", "Bravo(a)"];
 const ESTADOS: EstadoAnimal[] = ["Vivo(a)", "Muerto(a)", "Vendido(a)"];
 
+type SelectOption = {
+  value: string;
+  label: string;
+};
+
 /** Empty animal template. */
 function blankAnimal(): Omit<Animal, "animal_id" | "created_at" | "updated_at" | "created_by" | "_sync_status"> {
   return {
@@ -97,12 +102,26 @@ export default function AnimalFormPage() {
 
   // Load all animals for parent selection
   const allAnimals = useLiveQuery(() => db.animals.toArray()) ?? [];
-  const mothers = allAnimals
-    .filter((a) => a.sexo === "Hembra" && (!id || a.animal_id !== id))
-    .map((a) => `${a.animal_id} - ${a.nombre}`);
-  const fathers = allAnimals
-    .filter((a) => a.sexo === "Macho" && (!id || a.animal_id !== id))
-    .map((a) => `${a.animal_id} - ${a.nombre}`);
+  const mothers: SelectOption[] = allAnimals
+    .filter(
+      (a) =>
+        a.tipo === "Vaca" &&
+        a.sexo === "Hembra" &&
+        a.estado === "Vivo(a)" &&
+        (!id || a.animal_id !== id),
+    )
+    .map((a) => ({
+      value: a.animal_id,
+      label: `${a.nombre} ${a.arete_id}`.trim(),
+    }));
+  const fathers: SelectOption[] = allAnimals
+    .filter(
+      (a) => a.tipo === "Semental" && a.sexo === "Macho" && (!id || a.animal_id !== id),
+    )
+    .map((a) => ({
+      value: a.animal_id,
+      label: `${a.nombre} ${a.arete_id}`.trim(),
+    }));
 
   const update = (field: string) => (value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -123,8 +142,8 @@ export default function AnimalFormPage() {
           await db.animals.update(id, {
             ...form,
             peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
-            madre_id: form.madre_id.split(" - ")[0] ?? form.madre_id,
-            padre_id: form.padre_id.split(" - ")[0] ?? form.padre_id,
+            madre_id: form.madre_id,
+            padre_id: form.padre_id,
             updated_at: timestamp,
             _sync_status: "pending",
           });
@@ -162,8 +181,8 @@ export default function AnimalFormPage() {
             animal_id: animalId,
             ...form,
             peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
-            madre_id: form.madre_id.split(" - ")[0] ?? form.madre_id,
-            padre_id: form.padre_id.split(" - ")[0] ?? form.padre_id,
+            madre_id: form.madre_id,
+            padre_id: form.padre_id,
             created_by: userId,
             updated_at: timestamp,
             created_at: timestamp,

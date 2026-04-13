@@ -1,11 +1,21 @@
+type SelectOption = string | { value: string; label: string };
+
 interface SelectFieldProps {
   label: string;
   name: string;
   value: string;
   onChange: (value: string) => void;
-  options: readonly string[];
+  options: readonly SelectOption[];
   placeholder?: string;
   required?: boolean;
+}
+
+function getOptionValue(option: SelectOption) {
+  return typeof option === "string" ? option : option.value;
+}
+
+function getOptionLabel(option: SelectOption) {
+  return typeof option === "string" ? option : option.label;
 }
 
 export function SelectField({
@@ -33,8 +43,8 @@ export function SelectField({
       >
         <option value="">{placeholder}</option>
         {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
+          <option key={getOptionValue(opt)} value={getOptionValue(opt)}>
+            {getOptionLabel(opt)}
           </option>
         ))}
       </select>

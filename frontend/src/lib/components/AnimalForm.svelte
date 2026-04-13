@@ -15,6 +15,11 @@
 	} from '$lib/store';
 	import type { AnimalTipo, Sexo, Temperamento, EstadoAnimal } from '$lib/types';
 
+	type SelectOption = {
+		value: string;
+		label: string;
+	};
+
 	interface Props {
 		animalId?: string;
 	}
@@ -48,8 +53,8 @@
 		foto_url: ''
 	});
 
-	let mothers = $state<string[]>([]);
-	let fathers = $state<string[]>([]);
+	let mothers = $state<SelectOption[]>([]);
+	let fathers = $state<SelectOption[]>([]);
 
 	$effect(() => {
 		loadParents();
@@ -61,11 +66,25 @@
 	async function loadParents() {
 		const allAnimals = await db.animals.where('deleted').equals(0).toArray();
 		mothers = allAnimals
-			.filter((a) => a.sexo === 'Hembra' && (!animalId || a.animal_id !== animalId))
-			.map((a) => `${a.animal_id} - ${a.nombre}`);
+			.filter(
+				(a) =>
+					a.tipo === 'Vaca' &&
+					a.sexo === 'Hembra' &&
+					a.estado === 'Vivo(a)' &&
+					(!animalId || a.animal_id !== animalId)
+			)
+			.map((a) => ({
+				value: a.animal_id,
+				label: `${a.nombre} ${a.arete_id}`.trim()
+			}));
 		fathers = allAnimals
-			.filter((a) => a.sexo === 'Macho' && (!animalId || a.animal_id !== animalId))
-			.map((a) => `${a.animal_id} - ${a.nombre}`);
+			.filter(
+				(a) => a.tipo === 'Semental' && a.sexo === 'Macho' && (!animalId || a.animal_id !== animalId)
+			)
+			.map((a) => ({
+				value: a.animal_id,
+				label: `${a.nombre} ${a.arete_id}`.trim()
+			}));
 	}
 
 	async function loadExisting(id: string) {
@@ -104,15 +123,13 @@
 		saving = true;
 
 		try {
-			const madre = form.madre_id.split(' - ')[0] ?? form.madre_id;
-			const padre = form.padre_id.split(' - ')[0] ?? form.padre_id;
 			const peso = form.peso_actual ? Number(form.peso_actual) : null;
 
 			if (isEdit && animalId) {
 				await updateAnimal(animalId, {
 					...form,
-					madre_id: madre,
-					padre_id: padre,
+					madre_id: form.madre_id,
+					padre_id: form.padre_id,
 					peso_actual: peso
 				});
 
@@ -131,8 +148,8 @@
 			} else {
 				const animal = await createAnimal({
 					...form,
-					madre_id: madre,
-					padre_id: padre,
+					madre_id: form.madre_id,
+					padre_id: form.padre_id,
 					peso_actual: peso
 				});
 
