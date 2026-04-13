@@ -28,6 +28,11 @@
 	});
 
 	async function loadData() {
+		if (!id) {
+			loading = false;
+			return;
+		}
+
 		const entries = await db.recorridos.where('recorrido_id').equals(id).toArray();
 		if (entries.length === 0) {
 			loading = false;

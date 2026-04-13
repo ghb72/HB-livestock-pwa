@@ -195,10 +195,11 @@ export async function getRecorridosByDate(fecha: string): Promise<RecorridoEntry
 }
 
 export async function createRecorrido(
-	data: Omit<RecorridoEntry, 'recorrido_id' | keyof import('./types').SyncMeta>
+	data: Omit<RecorridoEntry, 'entry_id' | 'recorrido_id' | keyof import('./types').SyncMeta>
 ): Promise<RecorridoEntry> {
 	const record: RecorridoEntry = {
 		...data,
+		entry_id: generateId('RCE'),
 		recorrido_id: generateId('REC'),
 		synced: 0,
 		deleted: 0,
@@ -211,7 +212,10 @@ export async function createRecorrido(
 }
 
 export async function deleteRecorrido(id: string): Promise<void> {
-	await db.recorridos.update(id, { deleted: 1, synced: 0, updated_at: now() });
+	await db.recorridos
+		.where('recorrido_id')
+		.equals(id)
+		.modify({ deleted: 1, synced: 0, updated_at: now() });
 }
 
 // ── Photos ───────────────────────────────────────────────

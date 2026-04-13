@@ -52,7 +52,7 @@ const TABLES: TableConfig[] = [
 	{ name: 'reproduction', pk: 'reproduccion_id', table: () => db.reproduction },
 	{ name: 'observations', pk: 'observacion_id', table: () => db.observations },
 	{ name: 'sales', pk: 'venta_id', table: () => db.sales },
-	{ name: 'recorridos', pk: 'recorrido_id', table: () => db.recorridos }
+	{ name: 'recorridos', pk: 'entry_id', table: () => db.recorridos }
 ];
 
 // ── Pending detection ────────────────────────────────────
@@ -208,11 +208,12 @@ async function syncPhotos(): Promise<number> {
 
 async function pullAndApplyAll(): Promise<void> {
 	const fresh = await apiPullAll();
-	const freshData: Record<string, Record<string, unknown>[]> = fresh;
+	const freshData = fresh as unknown as Record<TableConfig['name'], Record<string, unknown>[]>;
 
 	for (const config of TABLES) {
 		const remoteRecords = freshData[config.name] ?? [];
 		const tbl = config.table();
+
 		const remoteIds = new Set(remoteRecords.map((r) => String(r[config.pk])));
 
 		for (const remote of remoteRecords) {

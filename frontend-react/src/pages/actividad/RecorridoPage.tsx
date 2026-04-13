@@ -87,6 +87,7 @@ export default function RecorridoPage() {
 
       const entries = Array.from(seen.entries()).map(
         ([animalId, notas]) => ({
+          entry_id: generateId("RCE"),
           recorrido_id: recorridoId,
           fecha,
           animal_id: animalId,

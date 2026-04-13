@@ -236,6 +236,7 @@ def create_recorridos_sheet(wb: openpyxl.Workbook) -> None:
     ws = wb.create_sheet("Recorridos")
 
     headers = [
+        "entry_id",
         "recorrido_id",
         "fecha",
         "animal_id",
@@ -244,7 +245,7 @@ def create_recorridos_sheet(wb: openpyxl.Workbook) -> None:
         "updated_at",
         "created_at",
     ]
-    widths = [18, 14, 12, 40, 12, 20, 20]
+    widths = [18, 18, 14, 12, 40, 12, 20, 20]
 
     apply_headers(ws, headers, widths)
 

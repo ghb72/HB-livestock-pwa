@@ -48,7 +48,7 @@ PK_KEYS = {
     "reproduction": "reproduccion_id",
     "observations": "observacion_id",
     "sales": "venta_id",
-    "recorridos": "recorrido_id",
+    "recorridos": "entry_id",
     "users": "user_id",
 }
 

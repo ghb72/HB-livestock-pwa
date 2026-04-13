@@ -113,6 +113,7 @@ export interface Sale extends SyncMeta {
 }
 
 export interface RecorridoEntry extends SyncMeta {
+  entry_id: string;
   recorrido_id: string;
   fecha: string;
   animal_id: string;

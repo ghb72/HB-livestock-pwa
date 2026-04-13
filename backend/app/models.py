@@ -79,6 +79,7 @@ class SaleRecord(SyncMeta):
 
 
 class RecorridoEntryRecord(SyncMeta):
+    entry_id: str
     recorrido_id: str
     fecha: str = ""
     animal_id: str = ""

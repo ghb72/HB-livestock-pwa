@@ -63,6 +63,7 @@
 
 			const entries: RecorridoEntry[] = Array.from(seen.entries()).map(
 				([animalId, notas]) => ({
+					entry_id: generateId('RCE'),
 					recorrido_id: recorridoId,
 					fecha,
 					animal_id: animalId,

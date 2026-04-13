@@ -24,7 +24,7 @@ const db = new Dexie('LivestockRegister') as Dexie & {
 	reproduction: EntityTable<ReproductionRecord, 'reproduccion_id'>;
 	observations: EntityTable<Observation, 'observacion_id'>;
 	sales: EntityTable<Sale, 'venta_id'>;
-	recorridos: EntityTable<RecorridoEntry, 'recorrido_id'>;
+	recorridos: EntityTable<RecorridoEntry, 'entry_id'>;
 	photos: EntityTable<AnimalPhoto, 'photo_id'>;
 	users: EntityTable<User, 'user_id'>;
 };
@@ -36,6 +36,17 @@ db.version(1).stores({
 	observations: 'observacion_id, animal_id, fecha, synced, deleted',
 	sales: 'venta_id, animal_id, fecha_venta, synced, deleted',
 	recorridos: 'recorrido_id, fecha, animal_id, synced, deleted',
+	photos: 'photo_id, animal_id, synced, deleted',
+	users: 'user_id, nombre'
+});
+
+db.version(2).stores({
+	animals: 'animal_id, arete_id, nombre, tipo, sexo, estado, synced, deleted',
+	health: 'salud_id, animal_id, fecha, tipo_evento, synced, deleted',
+	reproduction: 'reproduccion_id, vaca_id, semental_id, fecha_monta, synced, deleted',
+	observations: 'observacion_id, animal_id, fecha, synced, deleted',
+	sales: 'venta_id, animal_id, fecha_venta, synced, deleted',
+	recorridos: 'entry_id, recorrido_id, fecha, animal_id, synced, deleted',
 	photos: 'photo_id, animal_id, synced, deleted',
 	users: 'user_id, nombre'
 });
