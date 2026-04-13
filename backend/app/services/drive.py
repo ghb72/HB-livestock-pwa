@@ -15,6 +15,7 @@ from functools import lru_cache
 
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
 SCOPES = [
@@ -42,7 +43,12 @@ def _get_or_create_folder() -> str:
     Returns:
         The folder ID.
     """
+    configured_folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "").strip()
+    if configured_folder_id:
+        return configured_folder_id
+
     service = _get_drive_service()
+    shared_drive_id = os.getenv("GOOGLE_DRIVE_SHARED_DRIVE_ID", "").strip()
 
     # Search for existing folder
     query = (
@@ -50,11 +56,18 @@ def _get_or_create_folder() -> str:
         "and mimeType = 'application/vnd.google-apps.folder' "
         "and trashed = false"
     )
-    results = (
-        service.files()
-        .list(q=query, spaces="drive", fields="files(id)")
-        .execute()
-    )
+    list_kwargs = {
+        "q": query,
+        "spaces": "drive",
+        "fields": "files(id)",
+        "supportsAllDrives": True,
+        "includeItemsFromAllDrives": True,
+    }
+    if shared_drive_id:
+        list_kwargs["corpora"] = "drive"
+        list_kwargs["driveId"] = shared_drive_id
+
+    results = service.files().list(**list_kwargs).execute()
     files = results.get("files", [])
 
     if files:
@@ -65,11 +78,14 @@ def _get_or_create_folder() -> str:
         "name": FOLDER_NAME,
         "mimeType": "application/vnd.google-apps.folder",
     }
-    folder = (
-        service.files()
-        .create(body=file_metadata, fields="id")
-        .execute()
-    )
+    if shared_drive_id:
+        file_metadata["parents"] = [shared_drive_id]
+
+    folder = service.files().create(
+        body=file_metadata,
+        fields="id",
+        supportsAllDrives=True,
+    ).execute()
     return folder["id"]
 
 
@@ -107,7 +123,12 @@ def upload_photo(photo_id: str, base64_data: str) -> str:
 
     uploaded = (
         service.files()
-        .create(body=file_metadata, media_body=media, fields="id")
+        .create(
+            body=file_metadata,
+            media_body=media,
+            fields="id",
+            supportsAllDrives=True,
+        )
         .execute()
     )
 
@@ -117,6 +138,7 @@ def upload_photo(photo_id: str, base64_data: str) -> str:
     service.permissions().create(
         fileId=file_id,
         body={"role": "reader", "type": "anyone"},
+        supportsAllDrives=True,
     ).execute()
 
     return f"https://drive.google.com/uc?id={file_id}"
@@ -135,7 +157,7 @@ def delete_photo(drive_url: str) -> bool:
     try:
         file_id = drive_url.split("id=")[-1]
         service = _get_drive_service()
-        service.files().delete(fileId=file_id).execute()
+        service.files().delete(fileId=file_id, supportsAllDrives=True).execute()
         return True
     except Exception:
         return False
