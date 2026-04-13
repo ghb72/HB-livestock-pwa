@@ -5,9 +5,10 @@ Handles photo sync between the PWA (IndexedDB base64 blobs)
 and Google Drive (permanent cloud storage).
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ..auth import verify_token
 from ..services.drive import delete_photo, upload_photo
 
 router = APIRouter()
@@ -43,7 +44,10 @@ class BatchPhotoUploadResponse(BaseModel):
 
 
 @router.post("/upload", response_model=PhotoUploadResponse)
-async def upload_single_photo(request: PhotoUploadRequest):
+async def upload_single_photo(
+    request: PhotoUploadRequest,
+    _: str = Depends(verify_token),
+):
     """
     Upload a single photo to Google Drive.
 
@@ -65,7 +69,10 @@ async def upload_single_photo(request: PhotoUploadRequest):
 
 
 @router.post("/upload/batch", response_model=BatchPhotoUploadResponse)
-async def upload_batch_photos(request: BatchPhotoUploadRequest):
+async def upload_batch_photos(
+    request: BatchPhotoUploadRequest,
+    _: str = Depends(verify_token),
+):
     """
     Upload multiple photos to Google Drive in a single request.
 
@@ -97,7 +104,11 @@ async def upload_batch_photos(request: BatchPhotoUploadRequest):
 
 
 @router.delete("/{photo_id}")
-async def remove_photo(photo_id: str, drive_url: str):
+async def remove_photo(
+    photo_id: str,
+    drive_url: str,
+    _: str = Depends(verify_token),
+):
     """
     Delete a photo from Google Drive.
 
