@@ -9,11 +9,16 @@ Usage:
 """
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import photos, sync
+from .routers import auth, photos, sync
+
+# Load .env from the backend directory
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI(
     title="Livestock Register API",
@@ -50,5 +55,6 @@ async def health():
     return {"status": "healthy", "version": "1.0.0"}
 
 
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(photos.router, prefix="/api/photos", tags=["photos"])

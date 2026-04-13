@@ -10,7 +10,8 @@ from pydantic import BaseModel
 class SyncMeta(BaseModel):
     """Common sync metadata fields."""
 
-    _sync_status: str = "synced"
+    synced: int = 1
+    deleted: int = 0
     updated_at: str
     created_at: str
     created_by: str
