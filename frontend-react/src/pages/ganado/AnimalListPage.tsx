@@ -54,9 +54,10 @@ export default function AnimalListPage() {
 
   const animals = useLiveQuery(async () => {
     const all = await db.animals.toArray();
+    const aliveAnimals = all.filter((a) => a.estado === "Vivo(a)");
     const normalizedSearch = search.toLowerCase();
 
-    const filtered = all.filter((a) => {
+    const filtered = aliveAnimals.filter((a) => {
       const nombre = String(a.nombre ?? "").toLowerCase();
       const areteId = String(a.arete_id ?? "").toLowerCase();
       const matchSearch =

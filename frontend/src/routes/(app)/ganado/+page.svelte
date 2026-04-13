@@ -50,7 +50,8 @@
 		missingInfo = missing;
 
 		const normalizedSearch = search.toLowerCase();
-		const filtered = allAnimals.filter((a) => {
+		const aliveAnimals = allAnimals.filter((a) => a.estado === 'Vivo(a)');
+		const filtered = aliveAnimals.filter((a) => {
 			const nombre = String(a.nombre ?? '').toLowerCase();
 			const areteId = String(a.arete_id ?? '').toLowerCase();
 			const matchSearch = !normalizedSearch || nombre.includes(normalizedSearch) || areteId.includes(normalizedSearch);

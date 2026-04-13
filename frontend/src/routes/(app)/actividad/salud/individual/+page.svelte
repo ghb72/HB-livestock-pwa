@@ -40,7 +40,9 @@
 
 	async function loadAnimals() {
 		const all = await db.animals.where('deleted').equals(0).toArray();
-		animalOptions = all.map((a) => `${a.animal_id} - ${a.nombre}`);
+		animalOptions = all
+			.filter((a) => a.estado === 'Vivo(a)')
+			.map((a) => `${a.animal_id} - ${a.nombre}`);
 		if (preselected && !form.animal_id.includes(' - ')) {
 			const match = animalOptions.find((o) => o.startsWith(preselected));
 			if (match) form.animal_id = match;

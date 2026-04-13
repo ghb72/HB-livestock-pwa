@@ -34,8 +34,8 @@ export default function HealthFormPage() {
 
   const animals = useLiveQuery(() => db.animals.toArray()) ?? [];
   const animalOptions = animals.map(
-    (a) => `${a.animal_id} - ${a.nombre}`,
-  );
+    (a) => a.estado === "Vivo(a)" ? `${a.animal_id} - ${a.nombre}` : null,
+  ).filter((option): option is string => option !== null);
 
   const [form, setForm] = useState({
     animal_id: preselectedAnimal
