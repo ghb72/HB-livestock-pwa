@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { Calendar, ChevronRight, MapPin, Plus } from 'lucide-svelte';
+	import { Calendar, ChevronRight, Edit, MapPin, Plus, Trash2 } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import { deleteRecorrido } from '$lib/store';
 
 	type RecorridoGroup = {
 		id: string;
@@ -55,6 +56,12 @@
 			return dateStr;
 		}
 	}
+
+	async function handleDelete(recorridoId: string) {
+		if (!confirm('¿Estás seguro de eliminar este recorrido?')) return;
+		await deleteRecorrido(recorridoId);
+		await loadData();
+	}
 </script>
 
 <div class="mx-auto max-w-lg space-y-4">
@@ -76,43 +83,65 @@
 		<div class="space-y-2">
 			{#each recorridoList as rec (rec.id)}
 				{@const percentage = totalAlive > 0 ? Math.round((rec.count / totalAlive) * 100) : 0}
-				<Card
-					class="flex items-center gap-3"
-					onclick={() => goto(`/actividad/recorrido/${rec.id}`)}
-				>
-					<div
-						class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100"
-					>
-						<Calendar size={20} class="text-green-700" />
-					</div>
-					<div class="min-w-0 flex-1">
-						<p class="text-sm font-semibold capitalize text-gray-800">
-							{formatDate(rec.fecha)}
-						</p>
-						<div class="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-							<span>{rec.count} de {totalAlive} animales</span>
-							<span
-								class="font-semibold {percentage >= 80
-									? 'text-green-600'
-									: percentage >= 50
-										? 'text-amber-600'
-										: 'text-red-500'}"
-							>
-								{percentage}%
-							</span>
-						</div>
-						<div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+				<Card class="overflow-hidden p-0">
+					<div class="flex items-stretch">
+						<button
+							type="button"
+							onclick={() => goto(`/actividad/recorrido/${rec.id}`)}
+							class="flex min-w-0 flex-1 items-center gap-3 p-4 text-left"
+						>
 							<div
-								class="h-full rounded-full transition-all {percentage >= 80
-									? 'bg-green-500'
-									: percentage >= 50
-										? 'bg-amber-500'
-										: 'bg-red-400'}"
-								style="width: {percentage}%"
-							></div>
+								class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100"
+							>
+								<Calendar size={20} class="text-green-700" />
+							</div>
+							<div class="min-w-0 flex-1">
+								<p class="text-sm font-semibold capitalize text-gray-800">
+									{formatDate(rec.fecha)}
+								</p>
+								<div class="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+									<span>{rec.count} de {totalAlive} animales</span>
+									<span
+										class="font-semibold {percentage >= 80
+											? 'text-green-600'
+											: percentage >= 50
+												? 'text-amber-600'
+												: 'text-red-500'}"
+									>
+										{percentage}%
+									</span>
+								</div>
+								<div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+									<div
+										class="h-full rounded-full transition-all {percentage >= 80
+											? 'bg-green-500'
+											: percentage >= 50
+												? 'bg-amber-500'
+												: 'bg-red-400'}"
+										style="width: {percentage}%"
+									></div>
+								</div>
+							</div>
+							<ChevronRight size={18} class="text-gray-400" />
+						</button>
+						<div class="flex shrink-0 flex-col justify-center gap-2 border-l border-gray-100 p-3">
+							<a
+								href="/actividad/recorrido/{rec.id}/editar"
+								class="rounded-full bg-green-100 p-2.5 text-green-700 transition-colors hover:bg-green-200"
+								aria-label="Editar recorrido"
+							>
+								<Edit size={16} />
+							</a>
+							<button
+								type="button"
+								onclick={() => handleDelete(rec.id)}
+								class="rounded-full bg-red-100 p-2.5 text-red-700 transition-colors hover:bg-red-200"
+								aria-label="Eliminar recorrido"
+							>
+								<Trash2 size={16} />
+							</button>
 						</div>
 					</div>
-					<ChevronRight size={18} class="text-gray-400" />
 				</Card>
 			{/each}
 		</div>

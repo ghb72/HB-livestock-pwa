@@ -33,7 +33,9 @@
 			return;
 		}
 
-		const entries = await db.recorridos.where('recorrido_id').equals(id).toArray();
+		const entries = (await db.recorridos.where('recorrido_id').equals(id).toArray()).filter(
+			(entry) => entry.deleted === 0
+		);
 		if (entries.length === 0) {
 			loading = false;
 			return;
