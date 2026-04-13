@@ -99,6 +99,51 @@ def read_sheet(table_name: str) -> list[dict]:
     return worksheet.get_all_records()
 
 
+def read_all_sheets(
+    exclude: set[str] | None = None,
+) -> dict[str, list[dict]]:
+    """
+    Read all tables in a single batch API call (1 Sheets read request).
+
+    Uses ``spreadsheets.values.batchGet`` instead of N individual reads,
+    which dramatically reduces quota consumption.
+
+    Args:
+        exclude: Table names to skip (e.g., ``{"users"}``).
+
+    Returns:
+        Dict mapping table name → list of row dicts.
+    """
+    exclude = exclude or set()
+    spreadsheet = get_spreadsheet()
+
+    tables = {k: v for k, v in SHEET_NAMES.items() if k not in exclude}
+    if not tables:
+        return {}
+
+    ranges = [f"'{sheet_name}'" for sheet_name in tables.values()]
+    response = spreadsheet.values_batch_get(ranges)
+
+    result: dict[str, list[dict]] = {}
+    value_ranges = response.get("valueRanges", [])
+
+    for (table_name, _sheet_name), vr in zip(tables.items(), value_ranges):
+        values = vr.get("values", [])
+        if len(values) < 2:
+            result[table_name] = []
+            continue
+
+        headers = values[0]
+        records = []
+        for row in values[1:]:
+            padded = row + [""] * (len(headers) - len(row))
+            record = dict(zip(headers, padded))
+            records.append(record)
+        result[table_name] = records
+
+    return result
+
+
 def write_sheet(table_name: str, records: list[dict]) -> None:
     """
     Overwrite a sheet with the given records.
@@ -147,12 +192,15 @@ def merge_records(
     """
     Merge local records with cloud records using last-write-wins.
 
+    Handles soft-deletes: records with ``_deleted=True`` are removed
+    from the cloud sheet and excluded from the merged result.
+
     Args:
         table_name: Internal table name
         local_records: Records from the client's IndexedDB
 
     Returns:
-        Merged list of records, all marked as synced.
+        Merged list of records (without deleted ones), all marked synced.
     """
     pk_key = PK_KEYS.get(table_name)
     if not pk_key:
@@ -175,6 +223,11 @@ def merge_records(
         if not pk:
             continue
 
+        # Soft-delete: remove from cloud
+        if local.get("_deleted"):
+            cloud_index.pop(pk, None)
+            continue
+
         existing = cloud_index.get(pk)
         if existing:
             local_ts = local.get("updated_at", "")
@@ -186,10 +239,18 @@ def merge_records(
 
     merged = list(cloud_index.values())
 
-    try:
-        write_sheet(table_name, merged)
-    except Exception as exc:
-        logger.warning("Could not write sheet '%s': %s", table_name, exc)
+    # Strip internal sync flags before persisting to Sheets
+    for record in merged:
+        record.pop("_deleted", None)
+        record.pop("synced", None)
+        record.pop("deleted", None)
+
+    # Only write back if local records actually modified the cloud data
+    if local_records:
+        try:
+            write_sheet(table_name, merged)
+        except Exception as exc:
+            logger.warning("Could not write sheet '%s': %s", table_name, exc)
 
     for record in merged:
         record["_sync_status"] = "synced"
