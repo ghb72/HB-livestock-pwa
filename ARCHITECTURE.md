@@ -8,12 +8,14 @@ designed for users with minimal technology experience.
 
 | Layer | Technology | Reason |
 |-------|-----------|--------|
-| Frontend | Vite + React 18 + TypeScript | Lightweight SPA, ideal for offline PWA |
-| Styling | Tailwind CSS 3 | Rapid UI, responsive, utility-first |
+| Frontend | SvelteKit 2 + Svelte 5 + TypeScript | File-based routing, lightweight client app, ideal for offline PWA |
+| Styling | Tailwind CSS 4 | Rapid UI, responsive, utility-first |
 | Local DB | Dexie.js (IndexedDB) | Reliable offline storage with sync support |
-| PWA | vite-plugin-pwa (Workbox) | Service worker, caching, install prompt |
+| PWA | @vite-pwa/sveltekit + Workbox | Service worker, caching, install prompt |
 | Backend | FastAPI (Python 3.11+) | Lightweight API, easy deploy on Render |
 | Cloud DB | Google Sheets API (gspread) | XLSX-compatible, familiar to owner |
+| Cloud Files | Google Drive API | Persistent photo storage |
+| Auth | Shared Bearer token | Simple controlled access for small trusted teams |
 | Env Mgr | Conda (miniconda3) | Single env for Python + Node.js |
 | Deploy FE | Vercel | Free tier, git-based deploys |
 | Deploy BE | Render | Free tier, Python support |
@@ -24,7 +26,7 @@ designed for users with minimal technology experience.
 ┌─────────────────────────────────────────────────────┐
 │                    MOBILE DEVICE                     │
 │  ┌───────────────────────────────────────────────┐  │
-│  │              React PWA (Vite)                  │  │
+│  │        SvelteKit PWA (client rendered)         │  │
 │  │  ┌─────────┐  ┌──────────┐  ┌─────────────┐  │  │
 │  │  │   UI    │  │  Sync    │  │  Service     │  │  │
 │  │  │ Spanish │  │  Engine  │  │  Worker      │  │  │
@@ -32,8 +34,9 @@ designed for users with minimal technology experience.
 │  │       │             │               │         │  │
 │  │  ┌────▼─────────────▼───────────────▼──────┐  │  │
 │  │  │          IndexedDB (Dexie.js)           │  │  │
-│  │  │  animals | health | reproduction |      │  │  │
-│  │  │  sales | observations | users           │  │  │
+│  │  │ animals | health | reproduction |       │  │  │
+│  │  │ observations | sales | recorridos |     │  │  │
+│  │  │ photos | users                           │  │  │
 │  │  └────────────────────────────────────────┘   │  │
 │  └───────────────────────────────────────────────┘  │
 └──────────────────────┬──────────────────────────────┘
@@ -43,32 +46,30 @@ designed for users with minimal technology experience.
 │                 FastAPI Backend                       │
 │  ┌──────────┐  ┌───────────┐  ┌───────────────────┐ │
 │  │  Auth    │  │  Sync     │  │  Google Sheets    │ │
-│  │  (PIN)   │  │  Engine   │  │  Service          │ │
+│  │ Bearer   │  │  Engine   │  │  Service          │ │
 │  └──────────┘  └───────────┘  └─────────┬─────────┘ │
 └──────────────────────────────────────────┬───────────┘
                                            │
-                                           ▼
-                                 ┌──────────────────┐
-                                 │  Google Sheets   │
-                                 │  (Cloud DB)      │
-                                 │  6 hojas:        │
-                                 │  - Registro      │
-                                 │  - Salud         │
-                                 │  - Reproduccion  │
-                                 │  - Observaciones │
-                                 │  - Ventas        │
-                                 │  - Usuarios      │
-                                 └──────────────────┘
+                    ┌──────────────────────┴──────────────────────┐
+                    ▼                                             ▼
+          ┌──────────────────┐                         ┌──────────────────┐
+          │  Google Sheets   │                         │   Google Drive   │
+          │  (Cloud DB)      │                         │  Photo storage   │
+          └──────────────────┘                         └──────────────────┘
 ```
 
-## Data Model (6 Sheets)
+## Data Model (Sheets + Local Tables)
+
+Google Sheets stores the synced business tables. IndexedDB stores the same
+domain records plus local-only metadata such as `synced`, `deleted`, and
+pending photo payloads.
 
 ### 1. Usuarios
 | Column | Type | Description |
 |--------|------|-------------|
 | user_id | string | Auto: USR-001 |
 | nombre | string | Display name |
-| pin_hash | string | Hashed 4-6 digit PIN |
+| pin_hash | string | Reserved local field from early design; not used by production auth |
 | created_at | datetime | ISO 8601 |
 
 ### 2. Registro (Animals)
@@ -134,13 +135,11 @@ designed for users with minimal technology experience.
 |--------|------|-------------|
 | observacion_id | string | Auto: OBS-001 |
 | fecha | date | Observation date |
-| animal_id | string | FK → animal_id (1 row per animal) |
+| animal_id | string | FK → animal_id |
 | notas | string | Free text notes |
 | created_by | string | FK → user_id |
 | updated_at | datetime | Last modification |
 | created_at | datetime | Creation date |
-
-> Multiple animals in one observation share the same `observacion_id` + `fecha`.
 
 ### 6. Ventas (Sales)
 | Column | Type | Description |
@@ -158,26 +157,54 @@ designed for users with minimal technology experience.
 | updated_at | datetime | Last modification |
 | created_at | datetime | Creation date |
 
+### 7. Recorridos (Patrol Rounds)
+| Column | Type | Description |
+|--------|------|-------------|
+| recorrido_id | string | Shared visit/session identifier |
+| fecha | date | Patrol date |
+| animal_id | string | FK → animal_id |
+| notas | string | Quick field note |
+| created_by | string | FK → user_id |
+| updated_at | datetime | Last modification |
+| created_at | datetime | Creation date |
+
+### Local-only Photo Table
+| Column | Type | Description |
+|--------|------|-------------|
+| photo_id | string | Local photo identifier |
+| animal_id | string | FK → animal_id |
+| data_url | string | Temporary local image payload |
+| drive_url | string | Permanent Google Drive URL |
+| synced | 0\|1 | Local sync flag |
+| deleted | 0\|1 | Local soft-delete flag |
+| created_at | datetime | Creation date |
+
 ## Sync Strategy
 
-### Approach: Timestamp-based Last-Write-Wins
+### Approach: Push-then-pull, content-aware last-write-wins
 - Each record has `updated_at` timestamp
-- Local records have `_sync_status`: synced | pending | conflict (IndexedDB only)
-- Small dataset (<200 animals) allows full-sync approach
+- IndexedDB uses numeric local flags: `synced` and `deleted`
+- Soft deletes are sent as `_deleted=true` during sync
+- The client checks `/api/sync/state` before doing a full pull when there are no local changes
+- Small dataset (<200 animals) still allows pragmatic full-table merges
 
 ### Sync Flow
-1. User taps "Sincronizar" button (or auto-detect online)
-2. Client sends all records where `_sync_status = pending`
-3. Server reads Google Sheet, compares by ID + updated_at
-4. **Last-write-wins**: most recent `updated_at` takes precedence
-5. Server updates Google Sheet with merged data
-6. Server returns full dataset
-7. Client replaces local DB, marks all as `synced`
+1. User logs in with a shared token; all API requests then carry `Authorization: Bearer <token>`.
+2. When visible and online, the app checks `/api/sync/state` unless there are local pending changes.
+3. The client pushes all unsynced records table by table.
+4. The backend merges against Google Sheets using `updated_at` and handles soft deletes.
+5. If the client pushed changes, it performs a fresh full pull to avoid stale snapshots.
+6. Synced local records may be overwritten by remote changes; unsynced local rows are protected.
+7. Photos are uploaded separately to Google Drive and the returned `drive_url` is written back into the animal record.
 
 ### Conflict Handling
 - For 2-3 family users, last-write-wins is acceptable
 - `created_by` field tracks who made each change
-- Sync log shows what changed during each sync
+- Content comparison helps detect external Google Sheets edits even when local timestamps are unchanged
+
+### Failure Tolerance
+- If Google Sheets credentials are unavailable, sync endpoints return safe fallback payloads instead of discarding local data.
+- Sync state is kept in memory on the backend, so a server restart forces the next client check to behave like a fresh sync.
 
 ## UI Design Principles
 
@@ -192,7 +219,7 @@ designed for users with minimal technology experience.
 ### Navigation (Bottom Tabs)
 1. 🏠 **Inicio** - Dashboard + quick actions
 2. 🐄 **Ganado** - Animal list, search, add, detail
-3. 📋 **Actividad** - Health, reproduction, observations log
+3. 📋 **Actividad** - Health, reproduction, observations, recorridos, reproductive radar
 4. 💰 **Ventas** - Sales records and financial summary
 
 Header: Sync button + Settings gear
@@ -204,6 +231,7 @@ Header: Sync button + Settings gear
 - Fertility rate per cow
 - Breeding season timeline
 - Days open (days between calving and next conception)
+- Reproductive intelligence panel with herd semaphores and culling heuristics
 
 ### Financial Summary
 - Sales by period (monthly/yearly)
@@ -217,6 +245,11 @@ Header: Sync button + Settings gear
 - Health event timeline per animal
 - Herd health status overview (Fuerte/Flaco/Enfermo distribution)
 
+### Field Operations
+- Recorrido sessions grouped by date/session id
+- Observed vs missing animal detection
+- Last seen dates for active animals
+
 ### Genealogical Tree
 - Visual family tree per animal
 - Inbreeding warnings
@@ -228,15 +261,15 @@ Header: Sync button + Settings gear
 - [x] Architecture plan
 - [x] Conda environment (`environment.yml` — Python 3.11 + Node 22)
 - [x] XLSX data template (`backend/data/livestock_template.xlsx`)
-- [x] Frontend skeleton (Vite + React + Tailwind + PWA)
-- [x] IndexedDB schema (Dexie.js — 6 tables with sync indexes)
+- [x] Frontend skeleton (SvelteKit + Tailwind + PWA)
+- [x] IndexedDB schema (Dexie.js — domain tables, recorridos, photos, sync indexes)
 - [x] Backend skeleton (FastAPI + Google Sheets service)
 
 ### Phase 2: Core CRUD ✅
 - [x] Animal registration form + list view
 - [x] Animal detail view
-- [x] Offline data persistence (Dexie.js with _sync_status)
-- [ ] PIN authentication
+- [x] Offline data persistence (Dexie.js with numeric sync flags)
+- [x] Bearer token authentication
 - [x] Bottom tab navigation (4 tabs + header)
 
 ### Phase 3: Extended Records ✅
@@ -248,15 +281,17 @@ Header: Sync button + Settings gear
 
 ### Phase 4: Sync & Cloud ✅
 - [x] Google Sheets integration (`backend/app/services/sheets.py`)
-- [x] Bidirectional sync engine (last-write-wins merge)
+- [x] Bidirectional sync engine (push-then-pull, last-write-wins merge)
 - [x] Sync UI (SyncButton, online/offline status, pending count)
-- [ ] Summary columns computation for Google Sheets
+- [x] Google Drive photo upload flow
+- [x] Lightweight sync state endpoint for remote change detection
 
-### Phase 5: Analytics ← CURRENT
+### Phase 5: Analytics and Operations ← CURRENT
 - [x] Dashboard with key metrics (live count, health, repro, sales)
-- [ ] Reproductive calendar
-- [ ] Financial reports
-- [ ] Health alerts
+- [x] Reproductive calendar / intelligence view
+- [x] Recorrido history and missing-animal alerts
+- [x] Financial summary
+- [ ] Health alerts dashboard
 - [ ] Genealogical tree view
 
 ### Phase 6: Polish
