@@ -7,6 +7,13 @@ backend/credentials.json
 # Frontend
 frontend/.env
 frontend/.env.local
+frontend/node_modules
+frontend/.svelte-kit
+frontend/build
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
 
 # React Frontend
 frontend-react/
