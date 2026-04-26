@@ -1,3 +1,5 @@
+credentials.json
+
 # Backend
 backend/.env
 backend/credentials.json
@@ -5,6 +7,9 @@ backend/credentials.json
 # Frontend
 frontend/.env
 frontend/.env.local
+
+# React Frontend
+frontend-react/
 
 # Python
 __pycache__/
