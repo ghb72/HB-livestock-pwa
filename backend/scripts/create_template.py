@@ -1,7 +1,7 @@
 """
 XLSX Template Generator for Livestock Register
 
-Creates the Google Sheets-compatible template with all 6 sheets
+Creates the workbook template with all 6 sheets
 and proper column headers, formatting, and data validation.
 
 Usage:

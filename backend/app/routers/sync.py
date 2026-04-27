@@ -1,9 +1,9 @@
 """
-Sync router — handles bidirectional sync between PWA and Google Sheets.
+Sync router — handles bidirectional sync between PWA and Supabase.
 
 Endpoints:
     POST /api/sync/{table_name} — Push pending records, receive merged data
-    GET  /api/sync/pull          — Pull all data from Google Sheets
+    GET  /api/sync/pull          — Pull all data from Supabase tables
     GET  /api/sync/state         — Lightweight sync state for change detection
 """
 
@@ -34,11 +34,11 @@ def _bump_sync_state() -> None:
 
 
 def _safe_read(table_name: str) -> list[dict]:
-    """Read a sheet table, returning empty list if credentials missing."""
+    """Read a remote table, returning empty list if backend storage is unavailable."""
     try:
         return read_sheet(table_name)
     except Exception as e:
-        logger.warning("Sheets unavailable for '%s': %s — %s", table_name, type(e).__name__, e)
+        logger.warning("Supabase unavailable for '%s': %s — %s", table_name, type(e).__name__, e)
         return []
 
 
@@ -79,7 +79,7 @@ async def sync_table(
             server_count=len(merged),
         )
     except (FileNotFoundError, ValueError) as e:
-        logger.warning("Sheets unavailable for sync '%s': %s", table_name, e)
+        logger.warning("Supabase unavailable for sync '%s': %s", table_name, e)
         # Return the client records as-is so nothing is lost
         return SyncResponse(
             merged=request.records,
@@ -87,7 +87,7 @@ async def sync_table(
             server_count=0,
         )
     except Exception as e:
-        logger.warning("Sheets error on sync '%s': %s — %s", table_name, type(e).__name__, e)
+        logger.warning("Supabase error on sync '%s': %s — %s", table_name, type(e).__name__, e)
         return SyncResponse(
             merged=request.records,
             synced_count=0,
@@ -98,16 +98,16 @@ async def sync_table(
 @router.get("/pull", response_model=PullResponse)
 async def pull_all(_: str = Depends(verify_token)):
     """
-    Pull all data from Google Sheets.
+    Pull all data from Supabase.
 
     Used for initial load or manual refresh from cloud.
-    Returns empty data if Google Sheets credentials are not configured.
-    Uses a single batch API call instead of 6 individual reads.
+    Returns empty data if Supabase credentials are not configured.
+    Uses a single backend request that fans out across all synced tables.
     """
     try:
         data = read_all_sheets(exclude={"users"})
     except Exception as e:
-        logger.warning("Sheets batch read failed: %s — %s", type(e).__name__, e)
+        logger.warning("Supabase batch read failed: %s — %s", type(e).__name__, e)
         data = {}
 
     return PullResponse(

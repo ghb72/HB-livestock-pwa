@@ -1,7 +1,7 @@
 """
 Pydantic models for the Livestock Register API.
 
-Each model mirrors the IndexedDB / Google Sheets data schema.
+Each model mirrors the IndexedDB and synced Supabase table schema.
 """
 
 from pydantic import BaseModel

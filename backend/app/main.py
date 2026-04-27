@@ -1,7 +1,7 @@
 """
 Livestock Register — FastAPI Backend
 
-Provides sync endpoints between the PWA (IndexedDB) and Google Sheets.
+Provides sync endpoints between the PWA (IndexedDB) and Supabase.
 Uses timestamp-based last-write-wins sync strategy.
 
 Usage:
@@ -22,7 +22,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI(
     title="Livestock Register API",
-    description="Backend for livestock management PWA — sync with Google Sheets",
+    description="Backend for livestock management PWA — sync with Supabase tables and storage",
     version="1.0.0",
 )
 
