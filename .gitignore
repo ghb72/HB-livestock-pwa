@@ -9,6 +9,7 @@ frontend/.env
 frontend/.env.local
 frontend/node_modules
 frontend/.svelte-kit
+frontend/node_modules
 frontend/build
 frontend/.env
 frontend/.env.*
