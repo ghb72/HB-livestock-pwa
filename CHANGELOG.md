@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Consolidated photo upload and deletion behavior into the Supabase service layer so the photo sync endpoints no longer depend on legacy Google Drive credentials.
+
+### Fixed
+
+- Added `madre_id` and `padre_id` indexes to the Dexie `animals` store to prevent genealogy and offspring lookups from failing with `SchemaError` during sync-adjacent page loads.
+- Removed the remaining `credentials.json` dependency from the active photo sync path used by `POST /api/photos/upload/batch`.
+
 ## [1.1.1] - 2026-04-26
 
 ### Changed

@@ -51,4 +51,15 @@ db.version(2).stores({
 	users: 'user_id, nombre'
 });
 
+db.version(3).stores({
+	animals: 'animal_id, arete_id, nombre, tipo, sexo, estado, madre_id, padre_id, synced, deleted',
+	health: 'salud_id, animal_id, fecha, tipo_evento, synced, deleted',
+	reproduction: 'reproduccion_id, vaca_id, semental_id, fecha_monta, synced, deleted',
+	observations: 'observacion_id, animal_id, fecha, synced, deleted',
+	sales: 'venta_id, animal_id, fecha_venta, synced, deleted',
+	recorridos: 'entry_id, recorrido_id, fecha, animal_id, synced, deleted',
+	photos: 'photo_id, animal_id, synced, deleted',
+	users: 'user_id, nombre'
+});
+
 export { db };

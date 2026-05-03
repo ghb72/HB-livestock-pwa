@@ -58,6 +58,8 @@ Optional:
 - SUPABASE_STORAGE_PREFIX if you want images under another folder prefix
 - CORS_ORIGINS as a comma-separated list for extra frontend origins
 
+Legacy Google Drive and Google Sheets credentials are no longer used for photo sync. A `credentials.json` file is not required.
+
 The backend expects these synced tables in Supabase:
 
 - animals
@@ -104,8 +106,10 @@ Useful frontend commands:
 
 - The app starts at /login until a valid token is stored in localStorage.
 - After login, the PWA runs fully client-side and stores operational data in IndexedDB.
+- IndexedDB schema v3 adds `madre_id` and `padre_id` indexes to support genealogy and offspring queries without Dexie schema errors. Reload the app once after upgrading so the local database can migrate.
 - Sync is visibility-aware: when the app is visible and authenticated, it polls remote state, skips unnecessary pulls, and protects unsynced local changes.
 - Photos are first stored locally, then uploaded to Supabase Storage during sync.
+- The photo upload and deletion flow now runs entirely through `backend/app/services/supabase.py`, even if older compatibility imports still exist in the backend.
 - The backend talks to Supabase over HTTP using the service role key, so no Supabase Python SDK is required.
 
 ## Production Deployment

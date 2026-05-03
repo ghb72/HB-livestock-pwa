@@ -7,6 +7,7 @@ records and image files without an extra Python SDK dependency.
 
 from __future__ import annotations
 
+import base64
 import os
 from functools import lru_cache
 from urllib.parse import quote, unquote, urlparse
@@ -190,6 +191,45 @@ def extract_storage_path(file_url: str) -> str | None:
     if parsed.path.startswith(object_prefix):
         return unquote(parsed.path[len(object_prefix):])
     return None
+
+
+def upload_photo(photo_id: str, base64_data: str) -> str:
+    """Upload a base64-encoded photo to Supabase Storage and return its public URL."""
+    content_type, encoded_data = _parse_data_url(base64_data)
+    image_bytes = base64.b64decode(encoded_data)
+    storage_path = build_storage_path(photo_id, content_type)
+    upload_storage_object(storage_path, image_bytes, content_type)
+    return public_storage_url(storage_path)
+
+
+def delete_photo(photo_id: str, file_url: str) -> bool:
+    """Delete a photo from Supabase Storage by its public URL.
+
+    The photo_id argument is preserved for compatibility with existing callers.
+    """
+    del photo_id
+    try:
+        storage_path = extract_storage_path(file_url)
+        if not storage_path:
+            return False
+        delete_storage_object(storage_path)
+        return True
+    except Exception:
+        return False
+
+
+def _parse_data_url(base64_data: str) -> tuple[str, str]:
+    """Split a data URL into content type and base64 payload."""
+    default_content_type = "image/jpeg"
+    if "," not in base64_data:
+        return default_content_type, base64_data
+
+    header, encoded_data = base64_data.split(",", 1)
+    if ";base64" not in header:
+        return default_content_type, encoded_data
+
+    content_type = header.split(":", 1)[1].split(";", 1)[0].strip() or default_content_type
+    return content_type, encoded_data
 
 
 def _quote_filter_value(value: str) -> str:

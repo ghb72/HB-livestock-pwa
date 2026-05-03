@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth import verify_token
-from ..services.drive import delete_photo, upload_photo
+from ..services.supabase import delete_photo, upload_photo
 
 router = APIRouter()
 
