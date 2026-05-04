@@ -42,6 +42,7 @@
 	let proximaAplicacion = $state('');
 	let fecha = $state(new Date().toISOString().split('T')[0]);
 	let animals = $state<Animal[]>([]);
+	let photoMap = $state(new Map<string, string>());
 	let rows = $state<Record<string, AnimalRow>>({});
 
 	$effect(() => {
@@ -49,12 +50,31 @@
 	});
 
 	async function loadAnimals() {
-		animals = await db.animals
-			.where('deleted')
-			.equals(0)
-			.filter((a) => a.estado === 'Vivo(a)')
-			.toArray();
-		animals.sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
+		const [allAnimals, allPhotos] = await Promise.all([
+			db.animals
+				.where('deleted')
+				.equals(0)
+				.filter((a) => a.estado === 'Vivo(a)')
+				.toArray(),
+			db.photos.toArray()
+		]);
+
+		allAnimals.sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
+
+		const nextPhotoMap = new Map<string, string>();
+		for (const animal of allAnimals) {
+			if (animal.foto_url) {
+				nextPhotoMap.set(animal.animal_id, animal.foto_url);
+			}
+		}
+		for (const photo of allPhotos) {
+			if (photo.deleted === 0) {
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
+
+		animals = allAnimals;
+		photoMap = nextPhotoMap;
 	}
 
 	function getRow(id: string): AnimalRow {
@@ -255,13 +275,29 @@
 			<div class="max-h-[50vh] divide-y divide-gray-100 overflow-y-auto">
 				{#each animals as animal (animal.animal_id)}
 					{@const row = getRow(animal.animal_id)}
+					{@const photoSrc = photoMap.get(animal.animal_id)}
 					<div>
 						<div class="flex items-center gap-1 px-3 py-2">
-							<div class="min-w-0 flex-1">
+							<div class="flex min-w-0 flex-1 items-center gap-3">
+								{#if photoSrc}
+									<img
+										src={photoSrc}
+										alt={animal.nombre || 'Animal'}
+										class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-blue-100"
+									/>
+								{:else}
+									<div
+										class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700 ring-2 ring-blue-100"
+									>
+										{animal.nombre?.charAt(0)?.toUpperCase() ?? '?'}
+									</div>
+								{/if}
+								<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-semibold text-gray-800">
 									{animal.nombre || animal.arete_id}
 								</p>
 								<p class="truncate text-xs text-gray-400">{animal.animal_id}</p>
+								</div>
 							</div>
 							{#each selectedTypes as tipo}
 								<button

@@ -32,6 +32,7 @@
 	let showNotSeen = $state(true);
 	let showSeen = $state(true);
 	let animals = $state<Animal[]>([]);
+	let photoMap = $state(new Map<string, string>());
 
 	let seenCount = $derived(seen.size);
 	let totalCount = $derived(animals.length);
@@ -52,7 +53,25 @@
 	});
 
 	async function loadAnimals() {
-		animals = await db.animals.where('estado').equals('Vivo(a)').sortBy('nombre');
+		const [allAnimals, allPhotos] = await Promise.all([
+			db.animals.where('estado').equals('Vivo(a)').sortBy('nombre'),
+			db.photos.toArray()
+		]);
+
+		const nextPhotoMap = new Map<string, string>();
+		for (const animal of allAnimals) {
+			if (animal.foto_url) {
+				nextPhotoMap.set(animal.animal_id, animal.foto_url);
+			}
+		}
+		for (const photo of allPhotos) {
+			if (photo.deleted === 0) {
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
+
+		animals = allAnimals;
+		photoMap = nextPhotoMap;
 	}
 
 	async function loadExisting(id: string) {
@@ -208,15 +227,31 @@
 			{#if showNotSeen}
 				<div class="space-y-1.5">
 					{#each notObserved as animal (animal.animal_id)}
+						{@const photoSrc = photoMap.get(animal.animal_id)}
 						<Card class="overflow-hidden">
 							<div class="flex items-center gap-3">
-								<button
-									onclick={() => toggleAnimal(animal.animal_id)}
-									class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-gray-300 bg-white text-transparent transition-colors"
-									aria-label="Marcar animal como visto"
-								>
-									<Check size={20} strokeWidth={3} />
-								</button>
+								<div class="relative h-12 w-12 shrink-0">
+									{#if photoSrc}
+										<img
+											src={photoSrc}
+											alt={animal.nombre || 'Animal'}
+											class="h-12 w-12 rounded-full object-cover ring-2 ring-gray-200"
+										/>
+									{:else}
+										<div
+											class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-lg font-bold text-gray-500 ring-2 ring-gray-200"
+										>
+											{animal.nombre?.charAt(0)?.toUpperCase() ?? '?'}
+										</div>
+									{/if}
+									<button
+										onclick={() => toggleAnimal(animal.animal_id)}
+										class="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-white text-transparent shadow-sm transition-colors"
+										aria-label="Marcar animal como visto"
+									>
+										<Check size={14} strokeWidth={3} class="text-gray-300" />
+									</button>
+								</div>
 								<button
 									onclick={() => toggleAnimal(animal.animal_id)}
 									class="min-w-0 flex-1 text-left"
@@ -269,15 +304,31 @@
 			{#if showSeen}
 				<div class="space-y-1.5">
 					{#each observed as animal (animal.animal_id)}
+						{@const photoSrc = photoMap.get(animal.animal_id)}
 						<Card class="overflow-hidden">
 							<div class="flex items-center gap-3">
-								<button
-									onclick={() => toggleAnimal(animal.animal_id)}
-									class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-600 text-white transition-colors"
-									aria-label="Desmarcar animal"
-								>
-									<Check size={20} strokeWidth={3} />
-								</button>
+								<div class="relative h-12 w-12 shrink-0">
+									{#if photoSrc}
+										<img
+											src={photoSrc}
+											alt={animal.nombre || 'Animal'}
+											class="h-12 w-12 rounded-full object-cover ring-2 ring-green-200"
+										/>
+									{:else}
+										<div
+											class="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700 ring-2 ring-green-200"
+										>
+											{animal.nombre?.charAt(0)?.toUpperCase() ?? '?'}
+										</div>
+									{/if}
+									<button
+										onclick={() => toggleAnimal(animal.animal_id)}
+										class="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-green-600 text-white shadow-sm transition-colors"
+										aria-label="Desmarcar animal"
+									>
+										<Check size={14} strokeWidth={3} />
+									</button>
+								</div>
 								<button
 									onclick={() => toggleAnimal(animal.animal_id)}
 									class="min-w-0 flex-1 text-left"
