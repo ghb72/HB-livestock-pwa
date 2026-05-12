@@ -17,8 +17,28 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import auth, photos, sync
 
-# Load .env from the backend directory
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _current_app_env() -> str:
+    return (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "development").strip().lower()
+
+
+def _load_environment() -> str:
+    app_env = _current_app_env()
+
+    for env_file in (BASE_DIR / f".env.{app_env}", BASE_DIR / ".env"):
+        if env_file.exists():
+            load_dotenv(env_file, override=False)
+
+    return _current_app_env()
+
+
+def _parse_csv_env(name: str) -> list[str]:
+    return [value.strip() for value in os.getenv(name, "").split(",") if value.strip()]
+
+
+APP_ENV = _load_environment()
 
 app = FastAPI(
     title="Livestock Register API",
@@ -26,17 +46,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS — allow PWA frontend (dev + production)
-_extra_origins = os.getenv("CORS_ORIGINS", "").split(",")
-_origins = [
-    "http://localhost:5173",              # Vite dev server
-    "http://localhost:4173",              # Vite preview
-    "https://ganadolaescondida.vercel.app",  # Production frontend
-] + [o.strip() for o in _extra_origins if o.strip()]
+# CORS — fully configured from the selected environment file
+_origins = _parse_csv_env("CORS_ORIGINS")
+_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip() or None
+
+if _origins == ["*"] and _origin_regex is None:
+    _origins = []
+    _origin_regex = ".*"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
