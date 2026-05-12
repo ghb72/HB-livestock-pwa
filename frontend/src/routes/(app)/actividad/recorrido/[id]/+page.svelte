@@ -4,6 +4,7 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { formatStoredDate } from '$lib/date';
 	import { formatRecorridoTitle } from '$lib/recorridos';
 	import Card from '$lib/components/Card.svelte';
 	import type { Animal } from '$lib/types';
@@ -76,7 +77,7 @@
 
 	function formatDate(dateStr: string): string {
 		try {
-			return format(new Date(dateStr), "EEEE d 'de' MMMM, yyyy", { locale: es });
+			return formatStoredDate(dateStr, "EEEE d 'de' MMMM, yyyy", es);
 		} catch {
 			return dateStr;
 		}

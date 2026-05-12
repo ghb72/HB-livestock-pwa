@@ -13,6 +13,7 @@
 		Save
 	} from 'lucide-svelte';
 	import { db } from '$lib/db';
+	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
 	import type { Animal, RecorridoEntry } from '$lib/types';
@@ -24,7 +25,7 @@
 	let { recorridoId }: Props = $props();
 
 	let isEdit = $derived(Boolean(recorridoId));
-	let fecha = $state(format(new Date(), 'yyyy-MM-dd'));
+	let fecha = $state(todayLocalDate());
 	let seen = $state(new Map<string, string>());
 	let saving = $state(false);
 	let loading = $state(false);
@@ -151,7 +152,7 @@
 
 	function formatToday(): string {
 		try {
-			return format(new Date(fecha), "EEEE d 'de' MMMM", { locale: es });
+			return formatStoredDate(fecha, "EEEE d 'de' MMMM", es);
 		} catch {
 			return fecha;
 		}

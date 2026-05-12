@@ -5,6 +5,7 @@
 	import FormField from '$lib/components/FormField.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
+	import { todayLocalDate } from '$lib/date';
 	import { createHealthRecord } from '$lib/store';
 	import type { TipoEventoSalud, EstadoGeneral } from '$lib/types';
 
@@ -25,7 +26,7 @@
 
 	let form = $state({
 		animal_id: preselected,
-		fecha: new Date().toISOString().split('T')[0],
+		fecha: todayLocalDate(),
 		tipo_evento: '' as string,
 		producto: '',
 		dosis: '',

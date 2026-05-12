@@ -4,6 +4,7 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { formatStoredDate } from '$lib/date';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import type { Sale } from '$lib/types';
@@ -46,7 +47,7 @@
 	function formatDate(dateStr: string): string {
 		if (!dateStr) return '';
 		try {
-			return format(new Date(dateStr), 'd MMM yyyy', { locale: es });
+			return formatStoredDate(dateStr, 'd MMM yyyy', es);
 		} catch {
 			return dateStr;
 		}

@@ -6,6 +6,7 @@
 	import FormField from '$lib/components/FormField.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
+	import { parseStoredDate, todayLocalDate } from '$lib/date';
 	import {
 		createReproductionRecord,
 		createAnimal,
@@ -29,7 +30,7 @@
 	let { reproductionId, readonly = false }: Props = $props();
 
 	const preselected = page.url.searchParams.get('animal') ?? '';
-	const todayStr = () => new Date().toISOString().split('T')[0];
+	const todayStr = () => todayLocalDate();
 	const gestationAgo = () => format(subDays(new Date(), GESTATION_DAYS), 'yyyy-MM-dd');
 
 	let saving = $state(false);
@@ -64,7 +65,7 @@
 
 	let fechaPosibleParto = $derived(
 		form.fecha_monta
-			? format(addDays(new Date(form.fecha_monta), GESTATION_DAYS), 'yyyy-MM-dd')
+			? format(addDays(parseStoredDate(form.fecha_monta) ?? new Date(form.fecha_monta), GESTATION_DAYS), 'yyyy-MM-dd')
 			: ''
 	);
 

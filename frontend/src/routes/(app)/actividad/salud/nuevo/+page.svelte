@@ -2,6 +2,7 @@
 	import { ArrowLeft, Save, Check, StickyNote, X, Loader2 } from 'lucide-svelte';
 	import FormField from '$lib/components/FormField.svelte';
 	import { db } from '$lib/db';
+	import { todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId } from '$lib/helpers';
 	import type { Animal, TipoEventoSalud, EstadoGeneral, HealthRecord } from '$lib/types';
 
@@ -40,7 +41,7 @@
 	let selectedTypes = $state<TipoEventoSalud[]>([]);
 	let eventConfigs = $state<Record<string, EventConfig>>({});
 	let proximaAplicacion = $state('');
-	let fecha = $state(new Date().toISOString().split('T')[0]);
+	let fecha = $state(todayLocalDate());
 	let animals = $state<Animal[]>([]);
 	let photoMap = $state(new Map<string, string>());
 	let rows = $state<Record<string, AnimalRow>>({});

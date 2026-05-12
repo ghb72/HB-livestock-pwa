@@ -8,6 +8,7 @@
  */
 
 import { db } from '$lib/db';
+import { parseStoredDate } from '$lib/date';
 
 export interface MissingAnimalInfo {
 	missingIds: Set<string>;
@@ -78,7 +79,7 @@ export async function computeMissingAnimals(): Promise<MissingAnimalInfo> {
 		}
 
 		const daysSinceSeen = Math.floor(
-			(now.getTime() - new Date(lastSeen).getTime()) / (1000 * 60 * 60 * 24)
+			(now.getTime() - (parseStoredDate(lastSeen)?.getTime() ?? 0)) / (1000 * 60 * 60 * 24)
 		);
 		if (daysSinceSeen >= MISSING_DAYS_THRESHOLD) {
 			missingIds.add(animal.animal_id);

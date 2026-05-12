@@ -20,6 +20,7 @@
 	} from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import type { Animal, ReproductionRecord } from '$lib/types';
 
 	// ── Constants ──
@@ -251,7 +252,7 @@
 				? Math.round(iepValues.reduce((a, b) => a + b, 0) / iepValues.length)
 				: null;
 
-		const cutoff = subMonths(today, 12).toISOString().split('T')[0];
+		const cutoff = format(subMonths(today, 12), 'yyyy-MM-dd');
 		const allRecords = cowStatuses.flatMap((c) => c.records);
 		const births12m = allRecords.filter(
 			(r) => r.fecha_parto_real && r.fecha_parto_real >= cutoff

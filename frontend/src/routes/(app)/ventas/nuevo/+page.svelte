@@ -5,6 +5,7 @@
 	import FormField from '$lib/components/FormField.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
+	import { todayLocalDate } from '$lib/date';
 	import { createSale, updateAnimal } from '$lib/store';
 	import type { MotivoVenta } from '$lib/types';
 
@@ -22,7 +23,7 @@
 
 	let form = $state({
 		animal_id: preselected,
-		fecha_venta: new Date().toISOString().split('T')[0],
+		fecha_venta: todayLocalDate(),
 		motivo_venta: '' as string,
 		peso: '',
 		precio_total: '',

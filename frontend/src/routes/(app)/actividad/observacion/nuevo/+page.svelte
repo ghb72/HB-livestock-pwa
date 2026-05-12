@@ -4,6 +4,7 @@
 	import FormField from '$lib/components/FormField.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
+	import { todayLocalDate } from '$lib/date';
 	import { createObservation } from '$lib/store';
 
 	const preselected = page.url.searchParams.get('animal') ?? '';
@@ -13,7 +14,7 @@
 
 	let form = $state({
 		animal_id: preselected,
-		fecha: new Date().toISOString().split('T')[0],
+		fecha: todayLocalDate(),
 		notas: ''
 	});
 

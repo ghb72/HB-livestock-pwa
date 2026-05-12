@@ -14,6 +14,7 @@
 	import Card from '$lib/components/Card.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { db } from '$lib/db';
+	import { formatStoredDate } from '$lib/date';
 	import {
 		getAnimal,
 		getHealthRecords,
@@ -175,7 +176,7 @@
 	function fmtDate(dateStr: string): string {
 		if (!dateStr) return '—';
 		try {
-			return format(new Date(dateStr), 'd MMM yyyy', { locale: es });
+			return formatStoredDate(dateStr, 'd MMM yyyy', es);
 		} catch {
 			return dateStr;
 		}
