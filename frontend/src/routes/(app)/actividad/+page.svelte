@@ -25,11 +25,13 @@
 		type: 'reproduccion' | 'observacion';
 		title: string;
 		subtitle: string;
+		animalId: string;
 		animalName: string;
 	};
 
 	let animalMap = $state(new Map<string, string>());
 	let animalTagMap = $state(new Map<string, string>());
+	let photoMap = $state(new Map<string, string>());
 	let healthBatches = $state<HealthBatch[]>([]);
 	let activities = $state<ActivityItem[]>([]);
 
@@ -38,15 +40,29 @@
 	});
 
 	async function loadData() {
-		const [healthRecords, reproRecords, observations, animals] = await Promise.all([
+		const [healthRecords, reproRecords, observations, animals, photos] = await Promise.all([
 			db.health.where('deleted').equals(0).toArray(),
 			db.reproduction.where('deleted').equals(0).toArray(),
 			db.observations.where('deleted').equals(0).toArray(),
-			db.animals.toArray()
+			db.animals.toArray(),
+			db.photos.toArray()
 		]);
 
 		animalMap = new Map(animals.map((a) => [a.animal_id, a.nombre || a.arete_id]));
 		animalTagMap = new Map(animals.map((a) => [a.animal_id, a.arete_id || '—']));
+
+		const nextPhotoMap = new Map<string, string>();
+		for (const animal of animals) {
+			if (animal.foto_url) {
+				nextPhotoMap.set(animal.animal_id, animal.foto_url);
+			}
+		}
+		for (const photo of photos) {
+			if (photo.deleted === 0) {
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
+		photoMap = nextPhotoMap;
 
 		healthBatches = buildHealthBatches(healthRecords, animalMap, animalTagMap);
 
@@ -58,6 +74,7 @@
 				type: 'reproduccion' as const,
 				title: r.prenez_confirmada === 'Sí' ? 'Preñez confirmada' : 'Monta registrada',
 				subtitle: r.fecha_posible_parto ? `Posible parto: ${r.fecha_posible_parto}` : '',
+				animalId: r.vaca_id,
 				animalName: animalMap.get(r.vaca_id) ?? r.vaca_id
 			})),
 			...observations.map((o) => ({
@@ -66,6 +83,7 @@
 				type: 'observacion' as const,
 				title: 'Observación',
 				subtitle: o.notas.slice(0, 80),
+				animalId: o.animal_id,
 				animalName: animalMap.get(o.animal_id) ?? o.animal_id
 			}))
 		].sort((a, b) => b.date.localeCompare(a.date));
@@ -215,19 +233,30 @@
 		<div class="space-y-2">
 			{#each activities as item (item.id)}
 				{@const cfg = iconConfig[item.type]}
+				{@const photoSrc = item.type === 'reproduccion' ? photoMap.get(item.animalId) : undefined}
 				<Card
 					class="flex items-start gap-3"
 					onclick={item.type === 'reproduccion'
 						? () => goto(`/actividad/reproduccion/${item.id}`)
 						: undefined}
 				>
-					<div class="mt-0.5 rounded-lg p-2 {cfg.color}">
-						{#if item.type === 'reproduccion'}
-							<Baby size={18} />
-						{:else}
+					{#if item.type === 'reproduccion' && photoSrc}
+						<img
+							src={photoSrc}
+							alt={item.animalName}
+							class="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-pink-200"
+						/>
+					{:else if item.type === 'reproduccion'}
+						<div
+							class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-pink-100 text-lg font-bold text-pink-700"
+						>
+							{item.animalName?.charAt(0)?.toUpperCase() ?? '?'}
+						</div>
+					{:else}
+						<div class="mt-0.5 rounded-lg p-2 {cfg.color}">
 							<Eye size={18} />
-						{/if}
-					</div>
+						</div>
+					{/if}
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center justify-between">
 							<span class="font-semibold text-gray-800">{item.title}</span>
