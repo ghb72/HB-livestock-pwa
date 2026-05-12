@@ -9,6 +9,7 @@
 		options: readonly SelectOption[];
 		placeholder?: string;
 		required?: boolean;
+		disabled?: boolean;
 	}
 
 	let {
@@ -18,7 +19,8 @@
 		onchange,
 		options,
 		placeholder = 'Seleccionar...',
-		required = false
+		required = false,
+		disabled = false
 	}: Props = $props();
 
 	function getOptionValue(option: SelectOption) {
@@ -41,7 +43,8 @@
 		{value}
 		onchange={(e) => onchange(e.currentTarget.value)}
 		{required}
-		class="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+		{disabled}
+		class="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
 	>
 		<option value="">{placeholder}</option>
 		{#each options as opt}

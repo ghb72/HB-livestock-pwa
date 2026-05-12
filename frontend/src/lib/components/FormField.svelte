@@ -7,6 +7,7 @@
 		onchange: (value: string) => void;
 		placeholder?: string;
 		required?: boolean;
+		disabled?: boolean;
 	}
 
 	let {
@@ -16,11 +17,12 @@
 		value,
 		onchange,
 		placeholder,
-		required = false
+		required = false,
+		disabled = false
 	}: Props = $props();
 
 	const baseClasses =
-		'w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20';
+		'w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500';
 </script>
 
 <div class="space-y-1">
@@ -34,6 +36,7 @@
 			{name}
 			value={String(value)}
 			oninput={(e) => onchange(e.currentTarget.value)}
+			{disabled}
 			{placeholder}
 			rows={3}
 			class={baseClasses}
@@ -48,6 +51,7 @@
 			oninput={(e) => onchange(e.currentTarget.value)}
 			{placeholder}
 			{required}
+			{disabled}
 			class={baseClasses}
 		/>
 	{/if}

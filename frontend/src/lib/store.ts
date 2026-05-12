@@ -101,6 +101,11 @@ export async function getReproductionRecords(vacaId?: string): Promise<Reproduct
 	return db.reproduction.where('deleted').equals(0).toArray();
 }
 
+export async function getReproductionRecord(id: string): Promise<ReproductionRecord | undefined> {
+	const record = await db.reproduction.get(id);
+	return record && !record.deleted ? record : undefined;
+}
+
 export async function createReproductionRecord(
 	data: Omit<ReproductionRecord, 'reproduccion_id' | keyof import('./types').SyncMeta>
 ): Promise<ReproductionRecord> {
@@ -115,6 +120,13 @@ export async function createReproductionRecord(
 	};
 	await db.reproduction.add(record);
 	return record;
+}
+
+export async function updateReproductionRecord(
+	id: string,
+	data: Partial<Omit<ReproductionRecord, 'reproduccion_id' | keyof import('./types').SyncMeta>>
+): Promise<void> {
+	await db.reproduction.update(id, { ...data, synced: 0, updated_at: now() });
 }
 
 export async function deleteReproductionRecord(id: string): Promise<void> {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import {
 		HeartPulse,
 		Baby,
@@ -199,7 +200,12 @@
 		<div class="space-y-2">
 			{#each activities as item (item.id)}
 				{@const cfg = iconConfig[item.type]}
-				<Card class="flex items-start gap-3">
+				<Card
+					class="flex items-start gap-3"
+					onclick={item.type === 'reproduccion'
+						? () => goto(`/actividad/reproduccion/${item.id}`)
+						: undefined}
+				>
 					<div class="mt-0.5 rounded-lg p-2 {cfg.color}">
 						{#if item.type === 'reproduccion'}
 							<Baby size={18} />
