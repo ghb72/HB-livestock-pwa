@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { Calendar, ChevronRight, Edit, MapPin, Plus, Trash2 } from 'lucide-svelte';
+	import { ArrowLeft, Calendar, ChevronRight, Edit, MapPin, Plus, Trash2 } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { getRecorridoRelativeLabel } from '$lib/recorridos';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { deleteRecorrido } from '$lib/store';
@@ -66,9 +67,19 @@
 
 <div class="mx-auto max-w-lg space-y-4">
 	<div class="flex items-center justify-between">
-		<div>
-			<h2 class="text-xl font-bold text-gray-800">Recorridos</h2>
-			<p class="text-xs text-gray-500">Historial de visitas al potrero</p>
+		<div class="flex items-center gap-3">
+			<button
+				type="button"
+				onclick={() => history.back()}
+				class="rounded-lg p-1 text-gray-600 active:bg-gray-100"
+				aria-label="Volver"
+			>
+				<ArrowLeft size={22} />
+			</button>
+			<div>
+				<h2 class="text-xl font-bold text-gray-800">Recorridos</h2>
+				<p class="text-xs text-gray-500">Historial de visitas al potrero</p>
+			</div>
 		</div>
 		<a
 			href="/actividad/recorrido/nuevo"
@@ -83,6 +94,7 @@
 		<div class="space-y-2">
 			{#each recorridoList as rec (rec.id)}
 				{@const percentage = totalAlive > 0 ? Math.round((rec.count / totalAlive) * 100) : 0}
+				{@const relativeLabel = getRecorridoRelativeLabel(rec.fecha)}
 				<Card class="overflow-hidden p-0">
 					<div class="flex items-stretch">
 						<button
@@ -101,6 +113,11 @@
 								</p>
 								<div class="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
 									<span>{rec.count} de {totalAlive} animales</span>
+									{#if relativeLabel}
+										<span class="rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700">
+											{relativeLabel}
+										</span>
+									{/if}
 									<span
 										class="font-semibold {percentage >= 80
 											? 'text-green-600'

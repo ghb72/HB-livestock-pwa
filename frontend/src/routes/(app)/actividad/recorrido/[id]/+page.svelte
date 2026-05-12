@@ -4,6 +4,7 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { formatRecorridoTitle } from '$lib/recorridos';
 	import Card from '$lib/components/Card.svelte';
 	import type { Animal } from '$lib/types';
 
@@ -16,7 +17,6 @@
 
 	let loading = $state(true);
 	let fecha = $state('');
-	let recorridoId = $state('');
 	let observed = $state<ObservedItem[]>([]);
 	let notObserved = $state<Animal[]>([]);
 	let total = $state(0);
@@ -46,7 +46,6 @@
 		const animalsMap = new Map(allAlive.map((a) => [a.animal_id, a]));
 
 		fecha = entries[0].fecha;
-		recorridoId = id;
 		total = allAlive.length;
 
 		observed = entries
@@ -78,7 +77,7 @@
 				<ArrowLeft size={22} />
 			</button>
 			<div>
-				<h2 class="text-lg font-bold text-gray-800">Recorrido {recorridoId}</h2>
+				<h2 class="text-lg font-bold text-gray-800">{formatRecorridoTitle(fecha)}</h2>
 				<p class="text-sm capitalize text-gray-500">{formatDate(fecha)}</p>
 			</div>
 		</div>
