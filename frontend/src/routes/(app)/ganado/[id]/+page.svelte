@@ -44,11 +44,31 @@
 	let photoSrc = $state('');
 	let isMissing = $state(false);
 	let lastSeen = $state<string | undefined>();
-	let offspring = $state<{ animal_id: string; nombre: string; arete_id: string }[]>([]);
+	let offspring = $state<
+		{ animal_id: string; nombre: string; arete_id: string; photoSrc: string }[]
+	>([]);
 
 	$effect(() => {
 		if (animalId) loadAll(animalId);
 	});
+
+	const matingDates = $derived.by(() =>
+		Array.from(new Set(reproRecords.map((record) => record.fecha_monta).filter(Boolean))).sort((a, b) =>
+			b.localeCompare(a)
+		)
+	);
+
+	const inferredBirthDates = $derived.by(() =>
+		Array.from(
+			new Set(reproRecords.map((record) => record.fecha_posible_parto).filter(Boolean))
+		).sort((a, b) => b.localeCompare(a))
+	);
+
+	const actualBirthDates = $derived.by(() =>
+		Array.from(new Set(reproRecords.map((record) => record.fecha_parto_real).filter(Boolean))).sort(
+			(a, b) => b.localeCompare(a)
+		)
+	);
 
 	async function loadAll(id: string) {
 		const [a, health, obs, saleList, photos, missing] = await Promise.all([
@@ -97,20 +117,35 @@
 		}
 
 		// Offspring
-		const calvesByMother = await db.animals
-			.where('madre_id')
-			.equals(id)
-			.filter((r) => r.deleted === 0)
-			.toArray();
-		const byId = new Map<string, { animal_id: string; nombre: string; arete_id: string }>();
-		for (const c of calvesByMother) {
-			byId.set(c.animal_id, {
-				animal_id: c.animal_id,
-				nombre: c.nombre || 'Sin nombre',
-				arete_id: String(c.arete_id ?? '')
+		const [calvesByMother, calvesByFather, allPhotos] = await Promise.all([
+			db.animals
+				.where('madre_id')
+				.equals(id)
+				.filter((r) => r.deleted === 0)
+				.toArray(),
+			db.animals
+				.where('padre_id')
+				.equals(id)
+				.filter((r) => r.deleted === 0)
+				.toArray(),
+			db.photos.toArray()
+		]);
+		const byId = new Map<string, { animal_id: string; nombre: string; arete_id: string; photoSrc: string }>();
+		const photoMap = new Map<string, string>();
+		for (const photo of allPhotos) {
+			if (photo.deleted === 0) {
+				photoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
+		for (const calf of [...calvesByMother, ...calvesByFather]) {
+			byId.set(calf.animal_id, {
+				animal_id: calf.animal_id,
+				nombre: calf.nombre || 'Sin nombre',
+				arete_id: String(calf.arete_id ?? ''),
+				photoSrc: photoMap.get(calf.animal_id) || calf.foto_url || ''
 			});
 		}
-		for (const birth of allRepro.filter((r) => r.vaca_id === id)) {
+		for (const birth of allRepro) {
 			const calfId = String(birth.cria_id ?? '').trim();
 			if (!calfId || byId.has(calfId)) continue;
 			const calf = await db.animals.get(calfId);
@@ -118,10 +153,16 @@
 				byId.set(calf.animal_id, {
 					animal_id: calf.animal_id,
 					nombre: calf.nombre || 'Sin nombre',
-					arete_id: String(calf.arete_id ?? '')
+					arete_id: String(calf.arete_id ?? ''),
+					photoSrc: photoMap.get(calf.animal_id) || calf.foto_url || ''
 				});
 			} else {
-				byId.set(calfId, { animal_id: calfId, nombre: calfId, arete_id: '' });
+				byId.set(calfId, {
+					animal_id: calfId,
+					nombre: calfId,
+					arete_id: '',
+					photoSrc: photoMap.get(calfId) || ''
+				});
 			}
 		}
 		offspring = Array.from(byId.values());
@@ -351,6 +392,103 @@
 							<span class="text-xs text-gray-400">{fmtDate(h.fecha)}</span>
 						</div>
 					{/each}
+				</div>
+			</Card>
+		{/if}
+
+		{#if reproRecords.length > 0 || offspring.length > 0}
+			<Card>
+				<h3 class="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
+					Historial reproductivo
+				</h3>
+
+				<div class="space-y-3">
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+							Fechas de montas vistas
+						</p>
+						{#if matingDates.length > 0}
+							<div class="mt-2 flex flex-wrap gap-2">
+								{#each matingDates as date}
+									<span class="rounded-full bg-pink-50 px-3 py-1 text-xs font-medium text-pink-700">
+										{fmtDate(date)}
+									</span>
+								{/each}
+							</div>
+						{:else}
+							<p class="mt-1 text-sm text-gray-500">—</p>
+						{/if}
+					</div>
+
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+							Fechas de partos inferidas
+						</p>
+						{#if inferredBirthDates.length > 0}
+							<div class="mt-2 flex flex-wrap gap-2">
+								{#each inferredBirthDates as date}
+									<span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+										{fmtDate(date)}
+									</span>
+								{/each}
+							</div>
+						{:else}
+							<p class="mt-1 text-sm text-gray-500">—</p>
+						{/if}
+					</div>
+
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+							Fechas de partos reales
+						</p>
+						{#if actualBirthDates.length > 0}
+							<div class="mt-2 flex flex-wrap gap-2">
+								{#each actualBirthDates as date}
+									<span class="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+										{fmtDate(date)}
+									</span>
+								{/each}
+							</div>
+						{:else}
+							<p class="mt-1 text-sm text-gray-500">—</p>
+						{/if}
+					</div>
+
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+							Lista de hijos
+						</p>
+						{#if offspring.length > 0}
+							<div class="mt-2 space-y-2">
+								{#each offspring as calf (calf.animal_id)}
+									<a
+										href="/ganado/{calf.animal_id}"
+										class="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2 transition-colors active:bg-gray-100"
+									>
+										{#if calf.photoSrc}
+											<img
+												src={calf.photoSrc}
+												alt={calf.nombre}
+												class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-green-200"
+											/>
+										{:else}
+											<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700">
+												{calf.nombre?.charAt(0)?.toUpperCase() ?? '?'}
+											</div>
+										{/if}
+										<div class="min-w-0 flex-1">
+											<p class="truncate font-medium text-gray-800">{calf.nombre}</p>
+											<p class="text-xs text-gray-500">
+												{calf.arete_id ? `#${calf.arete_id}` : 'Sin arete'}
+											</p>
+										</div>
+									</a>
+								{/each}
+							</div>
+						{:else}
+							<p class="mt-1 text-sm text-gray-500">—</p>
+						{/if}
+					</div>
 				</div>
 			</Card>
 		{/if}
