@@ -20,6 +20,7 @@
 	let observed = $state<ObservedItem[]>([]);
 	let notObserved = $state<Animal[]>([]);
 	let total = $state(0);
+	let photoMap = $state(new Map<string, string>());
 
 	let percentage = $derived(total > 0 ? Math.round((observed.length / total) * 100) : 0);
 
@@ -41,12 +42,29 @@
 			return;
 		}
 
-		const allAlive = await db.animals.where('estado').equals('Vivo(a)').toArray();
+		const [allAlive, allPhotos] = await Promise.all([
+			db.animals.where('estado').equals('Vivo(a)').toArray(),
+			db.photos.toArray()
+		]);
 		const seenIds = new Set(entries.map((e) => e.animal_id));
 		const animalsMap = new Map(allAlive.map((a) => [a.animal_id, a]));
+		const photos = new Map<string, string>();
+
+		for (const animal of allAlive) {
+			if (animal.foto_url) {
+				photos.set(animal.animal_id, animal.foto_url);
+			}
+		}
+
+		for (const photo of allPhotos) {
+			if (photo.deleted === 0) {
+				photos.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
 
 		fecha = entries[0].fecha;
 		total = allAlive.length;
+		photoMap = photos;
 
 		observed = entries
 			.map((e) => ({ animal: animalsMap.get(e.animal_id)!, note: e.notas }))
@@ -106,12 +124,21 @@
 			</div>
 			<div class="space-y-1.5">
 				{#each observed as { animal, note } (animal.animal_id)}
+					{@const photoSrc = photoMap.get(animal.animal_id)}
 					<Card class="flex items-center gap-3">
-						<div
-							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600"
-						>
-							<Check size={16} strokeWidth={3} />
-						</div>
+						{#if photoSrc}
+							<img
+								src={photoSrc}
+								alt={animal.nombre}
+								class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-green-200"
+							/>
+						{:else}
+							<div
+								class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700"
+							>
+								{animal.nombre?.charAt(0)?.toUpperCase() ?? '?'}
+							</div>
+						{/if}
 						<div class="min-w-0 flex-1">
 							<span class="font-medium text-gray-800">
 								{animal.nombre || 'Sin nombre'}
@@ -122,6 +149,11 @@
 							{#if note}
 								<p class="text-xs text-gray-500">{note}</p>
 							{/if}
+						</div>
+						<div
+							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600"
+						>
+							<Check size={16} strokeWidth={3} />
 						</div>
 					</Card>
 				{/each}
@@ -139,12 +171,21 @@
 				</div>
 				<div class="space-y-1.5">
 					{#each notObserved as animal (animal.animal_id)}
+						{@const photoSrc = photoMap.get(animal.animal_id)}
 						<Card class="flex items-center gap-3 opacity-60">
-							<div
-								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-400"
-							>
-								<X size={16} strokeWidth={3} />
-							</div>
+							{#if photoSrc}
+								<img
+									src={photoSrc}
+									alt={animal.nombre}
+									class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-gray-200"
+								/>
+							{:else}
+								<div
+									class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-lg font-bold text-gray-500"
+								>
+									{animal.nombre?.charAt(0)?.toUpperCase() ?? '?'}
+								</div>
+							{/if}
 							<div class="min-w-0 flex-1">
 								<span class="font-medium text-gray-700">
 									{animal.nombre || 'Sin nombre'}
@@ -152,6 +193,11 @@
 								<span class="ml-2 text-xs text-gray-400">
 									#{animal.arete_id || '—'}
 								</span>
+							</div>
+							<div
+								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-400"
+							>
+								<X size={16} strokeWidth={3} />
 							</div>
 						</Card>
 					{/each}
