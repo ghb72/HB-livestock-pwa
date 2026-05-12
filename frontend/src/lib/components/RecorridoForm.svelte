@@ -13,6 +13,7 @@
 		Save
 	} from 'lucide-svelte';
 	import { db } from '$lib/db';
+	import DateField from '$lib/components/DateField.svelte';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
@@ -182,15 +183,8 @@
 	{#if loading}
 		<div class="py-12 text-center text-gray-400">Cargando recorrido...</div>
 	{:else}
-		<div class="flex items-center gap-3">
-			<label for="fecha" class="text-sm font-medium text-gray-600">Fecha:</label>
-			<input
-				id="fecha"
-				type="date"
-				value={fecha}
-				onchange={(e) => (fecha = e.currentTarget.value)}
-				class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-			/>
+		<div class="max-w-[220px]">
+			<DateField label="Fecha" name="fecha" value={fecha} onchange={(value) => (fecha = value)} />
 		</div>
 
 		<div class="rounded-xl bg-white p-4 shadow-sm">
