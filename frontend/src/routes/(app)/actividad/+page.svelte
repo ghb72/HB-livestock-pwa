@@ -12,31 +12,11 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { buildHealthBatches } from '$lib/health';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import type { HealthRecord, ReproductionRecord, Observation, TipoEventoSalud } from '$lib/types';
-
-	const HEALTH_EVENT_ORDER: TipoEventoSalud[] = [
-		'Vacuna',
-		'Desparasitación',
-		'Vitamina',
-		'Enfermedad',
-		'Tratamiento',
-		'Revisión'
-	];
-
-	type HealthAnimalRow = {
-		animalId: string;
-		animalName: string;
-		eventTypes: Set<TipoEventoSalud>;
-		notes: Set<string>;
-	};
-
-	type HealthBatch = {
-		date: string;
-		eventTypes: TipoEventoSalud[];
-		animals: HealthAnimalRow[];
-	};
+	import type { ReproductionRecord, Observation } from '$lib/types';
+	import type { HealthBatch } from '$lib/health';
 
 	type ActivityItem = {
 		id: string;
@@ -48,6 +28,7 @@
 	};
 
 	let animalMap = $state(new Map<string, string>());
+	let animalTagMap = $state(new Map<string, string>());
 	let healthBatches = $state<HealthBatch[]>([]);
 	let activities = $state<ActivityItem[]>([]);
 
@@ -64,37 +45,9 @@
 		]);
 
 		animalMap = new Map(animals.map((a) => [a.animal_id, a.nombre || a.arete_id]));
+		animalTagMap = new Map(animals.map((a) => [a.animal_id, a.arete_id || '—']));
 
-		// Build health batches
-		const byDate = new Map<string, Map<string, HealthAnimalRow>>();
-		for (const record of healthRecords) {
-			if (!byDate.has(record.fecha)) byDate.set(record.fecha, new Map());
-			const dateMap = byDate.get(record.fecha)!;
-			const name = animalMap.get(record.animal_id) ?? record.animal_id;
-			if (!dateMap.has(record.animal_id)) {
-				dateMap.set(record.animal_id, {
-					animalId: record.animal_id,
-					animalName: name,
-					eventTypes: new Set(),
-					notes: new Set()
-				});
-			}
-			const row = dateMap.get(record.animal_id)!;
-			row.eventTypes.add(record.tipo_evento);
-			if (record.notas?.trim()) row.notes.add(record.notas.trim());
-		}
-
-		healthBatches = [...byDate.entries()]
-			.sort(([a], [b]) => b.localeCompare(a))
-			.map(([date, animalRows]) => {
-				const animalsInBatch = [...animalRows.values()].sort((a, b) =>
-					a.animalName.localeCompare(b.animalName)
-				);
-				const eventTypesInBatch = HEALTH_EVENT_ORDER.filter((type) =>
-					animalsInBatch.some((row) => row.eventTypes.has(type))
-				);
-				return { date, eventTypes: eventTypesInBatch, animals: animalsInBatch };
-			});
+		healthBatches = buildHealthBatches(healthRecords, animalMap, animalTagMap);
 
 		// Build activity items (repro + observations)
 		activities = [
@@ -214,7 +167,7 @@
 									<tr class="border-b border-gray-50 last:border-b-0">
 										<td class="px-2 py-2 align-top">
 											<p class="font-medium text-gray-800">{row.animalName}</p>
-											<p class="text-xs text-gray-400">{row.animalId}</p>
+											<p class="text-xs text-gray-400">#{row.animalTag}</p>
 										</td>
 										{#each batch.eventTypes as eventType}
 											<td class="px-2 py-2 text-center align-top">

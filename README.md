@@ -14,6 +14,8 @@ reproduction, observations, sales, photos, and field patrol rounds
 - Cloud data: Supabase tables + Supabase Storage
 - Auth: shared Bearer token validated by the backend
 
+See AUTHENTICATION_GUIDE.md for the formal reusable authentication guide and implementation pattern.
+
 ## Project Structure
 
 - frontend/: PWA client application

@@ -2,6 +2,7 @@
 	import { Beef, HeartPulse, Baby, DollarSign, Plus, MapPin } from 'lucide-svelte';
 	import Card from '$lib/components/Card.svelte';
 	import { db } from '$lib/db';
+	import { buildHealthBatches } from '$lib/health';
 
 	let totalAnimals = $state(0);
 	let aliveAnimals = $state(0);
@@ -16,7 +17,8 @@
 			.equals('Vivo(a)')
 			.filter((a) => a.deleted === 0)
 			.count();
-		healthEvents = await db.health.where('deleted').equals(0).count();
+		const healthRecords = await db.health.where('deleted').equals(0).toArray();
+		healthEvents = buildHealthBatches(healthRecords).length;
 		reproEvents = await db.reproduction.where('deleted').equals(0).count();
 		salesCount = await db.sales.where('deleted').equals(0).count();
 	}
