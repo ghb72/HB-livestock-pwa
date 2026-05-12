@@ -87,49 +87,64 @@
 </script>
 
 <div class="mx-auto max-w-lg space-y-4">
-	<div class="flex items-center justify-between">
-		<h2 class="text-xl font-bold text-gray-800">Actividad</h2>
-		<div class="flex flex-wrap gap-2">
+	<section class="space-y-4 rounded-2xl bg-gradient-to-br from-white via-gray-50 to-pink-50 p-4 shadow-sm ring-1 ring-gray-100">
+		<div class="space-y-1">
+			<h2 class="text-2xl font-bold tracking-tight text-gray-800">Actividad</h2>
+			<p class="text-sm text-gray-500">Consulta vistas clave y registra nuevos eventos.</p>
+		</div>
+
+		<div class="space-y-2">
+			<h3 class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Vistas</h3>
+			<div class="flex flex-wrap gap-2">
 			<a
 				href="/actividad/recorridos"
-				class="flex items-center gap-1 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white"
+				class="flex items-center gap-1.5 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-green-800"
 			>
-				<MapPin size={14} /> Recorridos
+				<MapPin size={16} /> Mostrar Recorridos
 			</a>
 			<a
 				href="/actividad/calendario-reproductivo"
-				class="flex items-center gap-1 rounded-lg bg-pink-700 px-3 py-2 text-xs font-semibold text-white"
+				class="flex items-center gap-1.5 rounded-xl bg-pink-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-pink-800"
 			>
-				<CalendarDays size={14} /> Repro
+				<CalendarDays size={16} /> Inteligencia Reproductiva
 			</a>
-			<a
-				href="/actividad/salud/nuevo"
-				class="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
-				title="Evento masivo"
-			>
-				<ClipboardList size={14} /> Salud
-			</a>
-			<a
-				href="/actividad/salud/individual"
-				class="flex items-center gap-1 rounded-lg bg-blue-400 px-3 py-2 text-xs font-semibold text-white"
-				title="Evento individual"
-			>
-				<Plus size={14} /> 1 Salud
-			</a>
-			<a
-				href="/actividad/reproduccion/nuevo"
-				class="flex items-center gap-1 rounded-lg bg-pink-600 px-3 py-2 text-xs font-semibold text-white"
-			>
-				<Plus size={14} /> Repro
-			</a>
-			<a
-				href="/actividad/observacion/nuevo"
-				class="flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white"
-			>
-				<Plus size={14} /> Obs
-			</a>
+			</div>
 		</div>
-	</div>
+
+		<div class="space-y-2 border-t border-gray-200 pt-3">
+			<h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">
+				Nuevos eventos
+			</h3>
+			<div class="flex flex-wrap gap-2">
+				<a
+					href="/actividad/salud/nuevo"
+					class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-blue-700"
+					title="Evento masivo"
+				>
+					<ClipboardList size={16} /> Salud grupal
+				</a>
+				<a
+					href="/actividad/salud/individual"
+					class="flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-sky-600"
+					title="Evento individual"
+				>
+					<Plus size={16} /> Salud
+				</a>
+				<a
+					href="/actividad/reproduccion/nuevo"
+					class="flex items-center gap-1.5 rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-pink-700"
+				>
+					<Plus size={16} /> Reproducción
+				</a>
+				<a
+					href="/actividad/observacion/nuevo"
+					class="flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-purple-700"
+				>
+					<Plus size={16} /> Observación
+				</a>
+			</div>
+		</div>
+	</section>
 
 	{#if healthBatches.length > 0}
 		<section class="space-y-2">
