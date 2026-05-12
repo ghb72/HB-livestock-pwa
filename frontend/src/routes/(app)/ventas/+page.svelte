@@ -1,14 +1,16 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { Plus, DollarSign } from 'lucide-svelte';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import type { Sale, Animal } from '$lib/types';
+	import type { Sale } from '$lib/types';
 
 	let sales = $state<Sale[]>([]);
 	let animalMap = $state(new Map<string, string>());
+	let photoMap = $state(new Map<string, string>());
 
 	let totalRevenue = $derived(sales.reduce((s, v) => s + (v.precio_total ?? 0), 0));
 	let totalWeight = $derived(sales.reduce((s, v) => s + (v.peso ?? 0), 0));
@@ -19,12 +21,26 @@
 	});
 
 	async function loadData() {
-		const [allSales, allAnimals] = await Promise.all([
+		const [allSales, allAnimals, allPhotos] = await Promise.all([
 			db.sales.where('deleted').equals(0).toArray(),
-			db.animals.toArray()
+			db.animals.toArray(),
+			db.photos.toArray()
 		]);
 		sales = allSales.sort((a, b) => b.fecha_venta.localeCompare(a.fecha_venta));
 		animalMap = new Map(allAnimals.map((a) => [a.animal_id, a.nombre || a.arete_id]));
+
+		const photos = new Map<string, string>();
+		for (const animal of allAnimals) {
+			if (animal.foto_url) {
+				photos.set(animal.animal_id, animal.foto_url);
+			}
+		}
+		for (const photo of allPhotos) {
+			if (photo.deleted === 0) {
+				photos.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
+		photoMap = photos;
 	}
 
 	function formatDate(dateStr: string): string {
@@ -67,15 +83,25 @@
 
 		<div class="space-y-2">
 			{#each sales as sale (sale.venta_id)}
-				<Card class="flex items-center gap-3">
-					<div class="rounded-xl bg-amber-100 p-2.5 text-amber-700">
-						<DollarSign size={20} />
-					</div>
+				{@const photoSrc = photoMap.get(sale.animal_id)}
+				{@const animalName = animalMap.get(sale.animal_id) ?? sale.animal_id}
+				<Card class="flex items-center gap-3" onclick={() => goto(`/ganado/${sale.animal_id}`)}>
+					{#if photoSrc}
+						<img
+							src={photoSrc}
+							alt={animalName}
+							class="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-amber-200"
+						/>
+					{:else}
+						<div
+							class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-lg font-bold text-amber-700"
+						>
+							{animalName?.charAt(0)?.toUpperCase() ?? '?'}
+						</div>
+					{/if}
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center justify-between">
-							<span class="font-semibold text-gray-800">
-								{animalMap.get(sale.animal_id) ?? sale.animal_id}
-							</span>
+							<span class="font-semibold text-gray-800">{animalName}</span>
 							<span class="font-bold text-green-700">
 								${sale.precio_total?.toLocaleString() ?? '—'}
 							</span>
