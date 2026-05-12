@@ -2,6 +2,10 @@ credentials.json
 
 # Backend
 backend/.env
+backend/.env.*
+!backend/.env.example
+!backend/.env.development.example
+!backend/.env.production.example
 backend/credentials.json
 
 # Frontend
@@ -14,6 +18,8 @@ frontend/build
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+!frontend/.env.development.example
+!frontend/.env.production.example
 
 
 # React Frontend

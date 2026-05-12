@@ -47,7 +47,14 @@ conda activate livestock
 
 ### 2) Configure backend environment
 
-Create backend/.env from backend/.env.example and set:
+Use mode-specific files instead of a single shared backend environment:
+
+- backend/.env.development for local work
+- backend/.env.production for production-like runs when needed
+
+You can start from backend/.env.development.example and backend/.env.production.example.
+
+Set at least:
 
 - SUPABASE_URL
 - SUPABASE_SERVICE_ROLE_KEY
@@ -58,7 +65,10 @@ Optional:
 - SUPABASE_DB_SCHEMA if you do not use public
 - SUPABASE_STORAGE_BUCKET if the bucket name differs from livestock
 - SUPABASE_STORAGE_PREFIX if you want images under another folder prefix
-- CORS_ORIGINS as a comma-separated list for extra frontend origins
+- CORS_ORIGINS as a comma-separated list of allowed origins
+- CORS_ALLOW_ORIGIN_REGEX if you need a regex for dynamic dev origins
+
+The backend now reads backend/.env.<APP_ENV> first and falls back to backend/.env only for compatibility. If APP_ENV is not set, it defaults to development.
 
 Legacy Google Drive and Google Sheets credentials are no longer used for photo sync. A `credentials.json` file is not required.
 
@@ -91,6 +101,13 @@ Available backend endpoints:
 - POST /api/photos/upload/batch: upload pending photos to Supabase Storage
 
 ### 4) Run frontend
+
+Vite already supports separate mode files:
+
+- frontend/.env.development for local development
+- frontend/.env.production for production builds
+
+For local development, keep VITE_API_URL empty so the dev server proxies /api and /health to the backend on port 8000. This avoids browser CORS issues in the VS Code web viewer.
 
 ```bash
 cd frontend
