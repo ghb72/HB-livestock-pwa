@@ -3,6 +3,8 @@ import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
+const appShellRevision = process.env.VERCEL_GIT_COMMIT_SHA ?? new Date().toISOString();
+
 export default defineConfig({
 	server: {
 		host: '0.0.0.0',
@@ -26,6 +28,10 @@ export default defineConfig({
 		tailwindcss(),
 		sveltekit(),
 		SvelteKitPWA({
+			injectRegister: false,
+			kit: {
+				spa: true
+			},
 			registerType: 'autoUpdate',
 			manifest: {
 				name: 'HB Registro Ganadero',
@@ -58,6 +64,7 @@ export default defineConfig({
 				]
 			},
 			workbox: {
+				additionalManifestEntries: [{ url: '/', revision: appShellRevision }],
 				globPatterns: ['client/**/*.{js,css,html,svg,ico,woff,woff2,png}'],
 				runtimeCaching: [
 					{
