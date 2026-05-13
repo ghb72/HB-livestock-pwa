@@ -121,12 +121,17 @@ Useful frontend commands:
 - npm run build: production build
 - npm run preview: local preview of the production bundle
 
+You can start from frontend/.env.development.example and frontend/.env.production.example.
+
 ## Runtime Notes
 
 - The app starts at /login until a valid token is stored in localStorage.
 - After login, the PWA runs fully client-side and stores operational data in IndexedDB.
 - IndexedDB schema v3 adds `madre_id` and `padre_id` indexes to support genealogy and offspring queries without Dexie schema errors. Reload the app once after upgrading so the local database can migrate.
 - Sync is visibility-aware: when the app is visible and authenticated, it polls remote state, skips unnecessary pulls, and protects unsynced local changes.
+- Genealogy views are computed locally from IndexedDB animal, reproduction, and photo data; the graphical explorer supports focus changes, generation depth control, and pan/zoom without extra backend calls.
+- Date-heavy forms now use a shared `DD/MM/YYYY` input with native date-picker fallback to keep stored values consistent across pages.
+- Photos can be opened in a shared zoom/lightbox flow from herd, activity, sales, recorrido, and animal detail screens.
 - Photos are first stored locally, then uploaded to Supabase Storage during sync.
 - The photo upload and deletion flow now runs entirely through `backend/app/services/supabase.py`, even if older compatibility imports still exist in the backend.
 - The backend talks to Supabase over HTTP using the service role key, so no Supabase Python SDK is required.
@@ -148,9 +153,10 @@ Useful frontend commands:
 
 ## Current Feature Set
 
-- Animal registry with create, edit, detail view, genealogy links, and soft-delete.
-- Health workflows in both batch and single-animal modes.
-- Reproduction workflows for breeding, births, calf creation, and reproductive intelligence.
-- Observations, sales, and recorrido sessions with missing-animal detection.
+- Animal registry with create, edit, detail view, zoomable photos, genealogy links, graphical family tree, offspring summaries, reproductive history, and soft-delete.
+- Health workflows in both batch and single-animal modes, with shared batching logic for dashboard and activity timelines.
+- Reproduction workflows for breeding, births, calf creation, record detail/edit pages, and reproductive intelligence.
+- Observations, sales, and recorrido sessions with animal photos, relative date labels, and missing-animal detection.
+- Shared date-entry, photo lightbox, and zoom interactions across the main operational screens.
 - Offline-first sync for animals, health, reproduction, observations, sales, recorridos, and photos through Supabase.
 - PWA manifest and service-worker caching through @vite-pwa/sveltekit.

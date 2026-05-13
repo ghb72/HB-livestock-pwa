@@ -43,7 +43,7 @@ APP_ENV = _load_environment()
 app = FastAPI(
     title="Livestock Register API",
     description="Backend for livestock management PWA — sync with Supabase tables and storage",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 # CORS — fully configured from the selected environment file
@@ -73,7 +73,7 @@ async def root():
 @app.get("/health")
 async def health():
     """Detailed health check."""
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": "2.0.0"}
 
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

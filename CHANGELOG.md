@@ -4,9 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-13
+
+### Added
+
+- Added a graphical genealogy explorer for the herd module with focus controls, generation-depth filters, and pan/zoom navigation powered by local IndexedDB data.
+- Added a reusable reproduction form plus detail/edit screens for mating and birth records, including optional calf creation during birth registration.
+- Added shared date-entry and photo lightbox components so users can review photos and enter normalized dates consistently across the app.
+
 ### Changed
 
 - Consolidated photo upload and deletion behavior into the Supabase service layer so the photo sync endpoints no longer depend on legacy Google Drive credentials.
+- Refactored health record batching into a shared frontend utility used by dashboard and activity views.
+- Expanded photo-backed UI coverage across herd detail, activity, sales, recorrido, and genealogy-related screens.
+- Improved backend environment loading and CORS configuration to prefer mode-specific env files and support wildcard or regex-based origin settings.
 
 ### Fixed
 

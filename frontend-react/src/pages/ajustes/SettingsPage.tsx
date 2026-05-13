@@ -122,7 +122,7 @@ export default function SettingsPage() {
 
       {/* App info */}
       <div className="text-center text-xs text-gray-400">
-        <p>Registro Ganadero v1.0.0</p>
+        <p>Registro Ganadero v2.0.0</p>
         <p>Datos almacenados en IndexedDB (offline)</p>
       </div>
     </div>
