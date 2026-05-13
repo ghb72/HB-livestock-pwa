@@ -5,6 +5,7 @@
 		ArrowLeft,
 		Edit,
 		Trash2,
+		GitBranch,
 		HeartPulse,
 		Baby,
 		Eye,
@@ -213,6 +214,13 @@
 				</div>
 			</div>
 			<div class="flex gap-2">
+				<a
+					href="/ganado/grafica?animal={animal.animal_id}"
+					class="rounded-full bg-gray-100 p-2.5 text-gray-700 hover:bg-gray-200"
+					aria-label="Vista gráfica"
+				>
+					<GitBranch size={18} />
+				</a>
 				<a
 					href="/ganado/{animal.animal_id}/editar"
 					class="rounded-full bg-green-100 p-2.5 text-green-700 hover:bg-green-200"

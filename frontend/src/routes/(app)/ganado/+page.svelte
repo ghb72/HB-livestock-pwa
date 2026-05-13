@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Plus, Beef, AlertTriangle, ArrowUpDown } from 'lucide-svelte';
+	import { Plus, Beef, AlertTriangle, ArrowUpDown, GitBranch } from 'lucide-svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -89,13 +89,22 @@
 <div class="mx-auto max-w-lg space-y-4 p-4">
 	<div class="flex items-center justify-between">
 		<h2 class="text-xl font-bold text-gray-800">Ganado</h2>
-		<a
-			href="/ganado/nuevo"
-			class="flex items-center gap-1.5 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-green-700"
-		>
-			<Plus size={18} />
-			Agregar
-		</a>
+		<div class="flex items-center gap-2">
+			<a
+				href="/ganado/grafica"
+				class="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-gray-800"
+			>
+				<GitBranch size={18} />
+				Vista gráfica
+			</a>
+			<a
+				href="/ganado/nuevo"
+				class="flex items-center gap-1.5 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors active:bg-green-700"
+			>
+				<Plus size={18} />
+				Agregar
+			</a>
+		</div>
 	</div>
 
 	<SearchBar value={search} onchange={(v) => (search = v)} />
