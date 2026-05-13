@@ -1,7 +1,7 @@
 """
 Pydantic models for the Livestock Register API.
 
-Each model mirrors the IndexedDB / Google Sheets data schema.
+Each model mirrors the IndexedDB and synced Supabase table schema.
 """
 
 from pydantic import BaseModel
@@ -10,7 +10,8 @@ from pydantic import BaseModel
 class SyncMeta(BaseModel):
     """Common sync metadata fields."""
 
-    _sync_status: str = "synced"
+    synced: int = 1
+    deleted: int = 0
     updated_at: str
     created_at: str
     created_by: str
@@ -78,6 +79,7 @@ class SaleRecord(SyncMeta):
 
 
 class RecorridoEntryRecord(SyncMeta):
+    entry_id: str
     recorrido_id: str
     fecha: str = ""
     animal_id: str = ""

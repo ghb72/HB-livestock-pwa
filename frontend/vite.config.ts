@@ -1,51 +1,75 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import { VitePWA } from "vite-plugin-pwa";
+import { sveltekit } from '@sveltejs/kit/vite';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    VitePWA({
-      registerType: "prompt",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
-      manifest: {
-        name: "Registro Ganadero",
-        short_name: "Ganado",
-        description: "Registro y control de ganado bovino",
-        theme_color: "#16a34a",
-        background_color: "#f0fdf4",
-        display: "standalone",
-        orientation: "portrait",
-        start_url: "/",
-        icons: [
-          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" },
-          {
-            src: "/pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\./i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
-            },
-          },
-        ],
-      },
-    }),
-  ],
-  resolve: {
-    alias: { "@": "/src" },
-  },
+	server: {
+		host: '0.0.0.0',
+		allowedHosts: true,
+		proxy: {
+			'/api': {
+				target: 'http://localhost:8000',
+				changeOrigin: true
+			},
+			'/health': {
+				target: 'http://localhost:8000',
+				changeOrigin: true
+			}
+		}
+	},
+	preview: {
+		host: '0.0.0.0',
+		allowedHosts: true
+	},
+	plugins: [
+		tailwindcss(),
+		sveltekit(),
+		SvelteKitPWA({
+			registerType: 'autoUpdate',
+			manifest: {
+				name: 'HB Registro Ganadero',
+				short_name: 'Ganado',
+				description: 'Registro ganadero offline-first para manejo de hato',
+				start_url: '/',
+				scope: '/',
+				display: 'standalone',
+				background_color: '#F0FDF4',
+				theme_color: '#15803D',
+				orientation: 'portrait-primary',
+				categories: ['productivity'],
+				icons: [
+					{
+						src: 'icon-192.png',
+						sizes: '192x192',
+						type: 'image/png'
+					},
+					{
+						src: 'icon-512.png',
+						sizes: '512x512',
+						type: 'image/png'
+					},
+					{
+						src: 'icon.svg',
+						sizes: 'any',
+						type: 'image/svg+xml',
+						purpose: 'any'
+					}
+				]
+			},
+			workbox: {
+				globPatterns: ['client/**/*.{js,css,html,svg,ico,woff,woff2,png}'],
+				runtimeCaching: [
+					{
+						urlPattern: /^https?:\/\/.*\/api\//,
+						handler: 'NetworkFirst',
+						options: {
+							cacheName: 'api-cache',
+							expiration: { maxEntries: 50, maxAgeSeconds: 300 }
+						}
+					}
+				]
+			}
+		})
+	]
 });

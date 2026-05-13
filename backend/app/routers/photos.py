@@ -2,13 +2,14 @@
 Photo upload and management endpoints.
 
 Handles photo sync between the PWA (IndexedDB base64 blobs)
-and Google Drive (permanent cloud storage).
+and Supabase Storage (permanent cloud storage).
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..services.drive import delete_photo, upload_photo
+from ..auth import verify_token
+from ..services.supabase import delete_photo, upload_photo
 
 router = APIRouter()
 
@@ -43,12 +44,15 @@ class BatchPhotoUploadResponse(BaseModel):
 
 
 @router.post("/upload", response_model=PhotoUploadResponse)
-async def upload_single_photo(request: PhotoUploadRequest):
+async def upload_single_photo(
+    request: PhotoUploadRequest,
+    _: str = Depends(verify_token),
+):
     """
-    Upload a single photo to Google Drive.
+    Upload a single photo to Supabase Storage.
 
     Receives base64 image data and stores it in the
-    livestock-photos Drive folder.
+    configured storage bucket.
     """
     try:
         drive_url = upload_photo(request.photo_id, request.data_url)
@@ -65,9 +69,12 @@ async def upload_single_photo(request: PhotoUploadRequest):
 
 
 @router.post("/upload/batch", response_model=BatchPhotoUploadResponse)
-async def upload_batch_photos(request: BatchPhotoUploadRequest):
+async def upload_batch_photos(
+    request: BatchPhotoUploadRequest,
+    _: str = Depends(verify_token),
+):
     """
-    Upload multiple photos to Google Drive in a single request.
+    Upload multiple photos to Supabase Storage in a single request.
 
     Used during sync to push all pending photos at once.
     Returns both successful uploads and any errors.
@@ -97,18 +104,22 @@ async def upload_batch_photos(request: BatchPhotoUploadRequest):
 
 
 @router.delete("/{photo_id}")
-async def remove_photo(photo_id: str, drive_url: str):
+async def remove_photo(
+    photo_id: str,
+    drive_url: str,
+    _: str = Depends(verify_token),
+):
     """
-    Delete a photo from Google Drive.
+    Delete a photo from Supabase Storage.
 
     Args:
         photo_id: The photo identifier.
-        drive_url: The Google Drive URL to delete.
+        drive_url: The public storage URL to delete.
     """
-    success = delete_photo(drive_url)
+    success = delete_photo(photo_id, drive_url)
     if not success:
         raise HTTPException(
             status_code=500,
-            detail="Failed to delete photo from Drive",
+            detail="Failed to delete photo from storage",
         )
     return {"status": "deleted", "photo_id": photo_id}

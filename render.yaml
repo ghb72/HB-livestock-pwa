@@ -11,7 +11,15 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.11
-      - key: GOOGLE_SHEETS_CREDENTIALS_FILE
-        value: /etc/secrets/credentials.json
-      - key: GOOGLE_SHEETS_SPREADSHEET_ID
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_DB_SCHEMA
+        value: public
+      - key: SUPABASE_STORAGE_BUCKET
+        value: livestock
+      - key: SUPABASE_STORAGE_PREFIX
+        value: cattle-photos
+      - key: AUTH_TOKEN
         sync: false

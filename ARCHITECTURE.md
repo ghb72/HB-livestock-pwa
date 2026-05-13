@@ -1,266 +1,143 @@
-# Livestock Register - Architecture & Development Plan
+# Livestock Register - Architecture
 
 ## Overview
-PWA for livestock management (cattle ranching) with offline-first capability,
-designed for users with minimal technology experience.
+
+Offline-first PWA for cattle management, optimized for intermittent connectivity
+and simple field workflows.
 
 ## Tech Stack
 
-| Layer | Technology | Reason |
-|-------|-----------|--------|
-| Frontend | Vite + React 18 + TypeScript | Lightweight SPA, ideal for offline PWA |
-| Styling | Tailwind CSS 3 | Rapid UI, responsive, utility-first |
-| Local DB | Dexie.js (IndexedDB) | Reliable offline storage with sync support |
-| PWA | vite-plugin-pwa (Workbox) | Service worker, caching, install prompt |
-| Backend | FastAPI (Python 3.11+) | Lightweight API, easy deploy on Render |
-| Cloud DB | Google Sheets API (gspread) | XLSX-compatible, familiar to owner |
-| Env Mgr | Conda (miniconda3) | Single env for Python + Node.js |
-| Deploy FE | Vercel | Free tier, git-based deploys |
-| Deploy BE | Render | Free tier, Python support |
+| Layer | Technology | Role |
+|-------|-----------|------|
+| Frontend | SvelteKit 2 + Svelte 5 + TypeScript | Client-rendered PWA UI |
+| Styling | Tailwind CSS 4 | Responsive UI styling |
+| Local DB | Dexie.js over IndexedDB | Offline-first source of truth on the device |
+| PWA | @vite-pwa/sveltekit + Workbox | Service worker, caching, installability |
+| Backend | FastAPI on Python 3.11 | Auth, sync orchestration, photo upload |
+| Cloud DB | Supabase PostgREST | Remote relational tables accessed over HTTP |
+| Cloud Files | Supabase Storage | Remote image storage |
+| Auth | Shared Bearer token | Controlled access for a small trusted team |
+| Environment | Conda environment livestock | Local Python runtime for backend work |
+| Deploy FE | Vercel | Frontend hosting |
+| Deploy BE | Render | Backend hosting |
 
-## Architecture Diagram
+## Runtime Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    MOBILE DEVICE                     │
-│  ┌───────────────────────────────────────────────┐  │
-│  │              React PWA (Vite)                  │  │
-│  │  ┌─────────┐  ┌──────────┐  ┌─────────────┐  │  │
-│  │  │   UI    │  │  Sync    │  │  Service     │  │  │
-│  │  │ Spanish │  │  Engine  │  │  Worker      │  │  │
-│  │  └────┬────┘  └────┬─────┘  └──────┬──────┘  │  │
-│  │       │             │               │         │  │
-│  │  ┌────▼─────────────▼───────────────▼──────┐  │  │
-│  │  │          IndexedDB (Dexie.js)           │  │  │
-│  │  │  animals | health | reproduction |      │  │  │
-│  │  │  sales | observations | users           │  │  │
-│  │  └────────────────────────────────────────┘   │  │
-│  └───────────────────────────────────────────────┘  │
-└──────────────────────┬──────────────────────────────┘
-                       │ HTTPS (when online)
-                       ▼
-┌──────────────────────────────────────────────────────┐
-│                 FastAPI Backend                       │
-│  ┌──────────┐  ┌───────────┐  ┌───────────────────┐ │
-│  │  Auth    │  │  Sync     │  │  Google Sheets    │ │
-│  │  (PIN)   │  │  Engine   │  │  Service          │ │
-│  └──────────┘  └───────────┘  └─────────┬─────────┘ │
-└──────────────────────────────────────────┬───────────┘
-                                           │
-                                           ▼
-                                 ┌──────────────────┐
-                                 │  Google Sheets   │
-                                 │  (Cloud DB)      │
-                                 │  6 hojas:        │
-                                 │  - Registro      │
-                                 │  - Salud         │
-                                 │  - Reproduccion  │
-                                 │  - Observaciones │
-                                 │  - Ventas        │
-                                 │  - Usuarios      │
-                                 └──────────────────┘
+```text
+Mobile device
+  SvelteKit PWA
+    UI + sync engine + service worker
+    IndexedDB tables
+      animals, health, reproduction, observations, sales, recorridos, photos, users
+
+        |
+        | HTTPS when online
+        v
+
+FastAPI backend
+  auth router
+  sync router
+  photo router
+  Supabase HTTP service layer
+
+        |
+        +--> Supabase tables
+        |
+        +--> Supabase Storage
 ```
 
-## Data Model (6 Sheets)
+## Data Surfaces
 
-### 1. Usuarios
-| Column | Type | Description |
-|--------|------|-------------|
-| user_id | string | Auto: USR-001 |
-| nombre | string | Display name |
-| pin_hash | string | Hashed 4-6 digit PIN |
-| created_at | datetime | ISO 8601 |
+### Local device data
 
-### 2. Registro (Animals)
-| Column | Type | Description |
-|--------|------|-------------|
-| animal_id | string | Auto: ANI-001 |
-| arete_id | string | Ear tag number (manual) |
-| nombre | string | Animal name |
-| tipo | enum | Semental, Becerro(a), Vaquilla, Vaca, Torete |
-| sexo | enum | Macho, Hembra |
-| fecha_nacimiento | date | Birth date |
-| raza | string | Free text breed |
-| madre_id | string | FK → animal_id |
-| padre_id | string | FK → animal_id |
-| temperamento | enum | Normal, Manso(a), Bravo(a) |
-| estado | enum | Vivo(a), Muerto(a), Vendido(a) |
-| peso_actual | number | Latest weight (kg) |
-| notas | string | Free text |
-| foto_url | string | Phase 2 |
-| created_by | string | FK → user_id |
-| updated_at | datetime | Last modification |
-| created_at | datetime | Creation date |
+IndexedDB stores the working set used by the PWA, including sync metadata.
+Each business record keeps local fields such as synced and deleted until it is
+reconciled with the backend.
 
-> **Note**: "Último Parto", "N. Crías", "Peso destete última cría",
-> "Enfermedades", "Tratamientos" are computed from Reproduccion and Salud
-> sheets. The backend calculates these summaries when writing to Google Sheets.
+The local photo table contains:
 
-### 3. Salud (Health Records)
-| Column | Type | Description |
-|--------|------|-------------|
-| salud_id | string | Auto: SAL-001 |
-| animal_id | string | FK → animal_id |
-| fecha | date | Event date |
-| tipo_evento | enum | Vacuna, Desparasitación, Vitamina, Enfermedad, Tratamiento, Revisión |
-| producto | string | Product/vaccine/medicine name |
-| dosis | string | Dosage applied |
-| estado_general | enum | Fuerte, Flaco, Enfermo |
-| proxima_aplicacion | date | Next scheduled date (alerts) |
-| notas | string | Free text |
-| created_by | string | FK → user_id |
-| updated_at | datetime | Last modification |
-| created_at | datetime | Creation date |
+- photo_id
+- animal_id
+- data_url for pending local payloads
+- drive_url as the persisted public URL field already used by the frontend
+- synced
+- deleted
+- created_at
 
-### 4. Reproduccion (Breeding)
-| Column | Type | Description |
-|--------|------|-------------|
-| reproduccion_id | string | Auto: REP-001 |
-| vaca_id | string | FK → animal_id (cow) |
-| semental_id | string | FK → animal_id (bull) |
-| fecha_monta | date | Observed breeding date |
-| fecha_posible_parto | date | Auto: fecha_monta + 283 days |
-| prenez_confirmada | enum | Sí, No, Pendiente |
-| fecha_parto_real | date | Actual birth date |
-| cria_id | string | FK → animal_id (calf born) |
-| peso_destete_cria | number | Weaning weight of calf (kg) |
-| notas | string | Free text |
-| created_by | string | FK → user_id |
-| updated_at | datetime | Last modification |
-| created_at | datetime | Creation date |
+The field name drive_url is legacy naming. It now stores the public URL returned
+by Supabase Storage.
 
-### 5. Observaciones (Field Observations)
-| Column | Type | Description |
-|--------|------|-------------|
-| observacion_id | string | Auto: OBS-001 |
-| fecha | date | Observation date |
-| animal_id | string | FK → animal_id (1 row per animal) |
-| notas | string | Free text notes |
-| created_by | string | FK → user_id |
-| updated_at | datetime | Last modification |
-| created_at | datetime | Creation date |
+### Remote Supabase tables
 
-> Multiple animals in one observation share the same `observacion_id` + `fecha`.
+The backend reads and writes these tables directly through PostgREST:
 
-### 6. Ventas (Sales)
-| Column | Type | Description |
-|--------|------|-------------|
-| venta_id | string | Auto: VTA-001 |
-| animal_id | string | FK → animal_id |
-| fecha_venta | date | Sale date |
-| motivo_venta | enum | Por peso (destete), Por edad, Por productividad, Otro |
-| peso | number | Weight at sale (kg) |
-| precio_total | number | Total price ($) |
-| precio_kg | number | Computed or manual ($/kg) |
-| comprador | string | Buyer name |
-| notas | string | Free text |
-| created_by | string | FK → user_id |
-| updated_at | datetime | Last modification |
-| created_at | datetime | Creation date |
+- animals with primary key animal_id
+- health with primary key salud_id
+- reproduction with primary key reproduccion_id
+- observations with primary key observacion_id
+- sales with primary key venta_id
+- recorridos with primary key entry_id
+- users with primary key user_id
+
+### Remote image storage
+
+Photos are stored in the configured Supabase bucket under the configured prefix.
+The backend builds a canonical object path from photo_id plus MIME type and
+returns a public URL for later display in the app.
 
 ## Sync Strategy
 
-### Approach: Timestamp-based Last-Write-Wins
-- Each record has `updated_at` timestamp
-- Local records have `_sync_status`: synced | pending | conflict (IndexedDB only)
-- Small dataset (<200 animals) allows full-sync approach
+### Approach
 
-### Sync Flow
-1. User taps "Sincronizar" button (or auto-detect online)
-2. Client sends all records where `_sync_status = pending`
-3. Server reads Google Sheet, compares by ID + updated_at
-4. **Last-write-wins**: most recent `updated_at` takes precedence
-5. Server updates Google Sheet with merged data
-6. Server returns full dataset
-7. Client replaces local DB, marks all as `synced`
+The application uses push-then-pull synchronization with last-write-wins based
+on updated_at.
 
-### Conflict Handling
-- For 2-3 family users, last-write-wins is acceptable
-- `created_by` field tracks who made each change
-- Sync log shows what changed during each sync
+- The client pushes unsynced rows table by table.
+- Soft deletes are sent with _deleted=true.
+- The backend reads the current remote rows, merges by primary key, deletes
+  rows marked for removal, and upserts the final set.
+- After a successful push, the client performs a fresh pull when needed.
+- Sync state is also exposed through /api/sync/state so the frontend can skip
+  unnecessary full pulls.
 
-## UI Design Principles
+### Conflict model
 
-- **Large touch targets**: 56px+ buttons
-- **Bottom tab navigation**: 4 tabs max
-- **High contrast**: Dark text on light backgrounds
-- **Minimal typing**: Dropdowns, date pickers, number pads
-- **Spanish only**: All labels, buttons, messages in Spanish
-- **Card-based**: Animals displayed as visual cards
-- **Search**: By name or ear tag number
+This project assumes a small number of trusted users. Under that constraint,
+last-write-wins is acceptable and simpler than operational transforms or row
+version graphs.
 
-### Navigation (Bottom Tabs)
-1. 🏠 **Inicio** - Dashboard + quick actions
-2. 🐄 **Ganado** - Animal list, search, add, detail
-3. 📋 **Actividad** - Health, reproduction, observations log
-4. 💰 **Ventas** - Sales records and financial summary
+### Failure tolerance
 
-Header: Sync button + Settings gear
+If Supabase is unavailable or misconfigured, the backend returns safe fallback
+payloads instead of dropping local data. A server restart also resets the
+in-memory sync version, forcing the next client check to behave like a fresh
+sync.
 
-## Analytics Features (Reports)
+## Backend Responsibilities
 
-### Reproductive Cycles
-- Calendar view of expected births
-- Fertility rate per cow
-- Breeding season timeline
-- Days open (days between calving and next conception)
+- Validate the shared Bearer token.
+- Expose sync endpoints for each business table.
+- Merge local and remote records by updated_at.
+- Upload and delete animal photos in Supabase Storage.
+- Translate storage object paths into public URLs consumed by the frontend.
 
-### Financial Summary
-- Sales by period (monthly/yearly)
-- Average price per kg
-- Revenue trends
-- Sales by motive breakdown
+## Deployment Notes
 
-### Herd Health
-- Vaccination schedule / calendar
-- Upcoming deworming alerts
-- Health event timeline per animal
-- Herd health status overview (Fuerte/Flaco/Enfermo distribution)
+### Local development
 
-### Genealogical Tree
-- Visual family tree per animal
-- Inbreeding warnings
-- Best producer tracking (most calves, best weaning weights)
+Backend work should be run from the existing conda environment livestock.
 
-## Development Phases
+Typical backend variables:
 
-### Phase 1: Foundation ✅
-- [x] Architecture plan
-- [x] Conda environment (`environment.yml` — Python 3.11 + Node 22)
-- [x] XLSX data template (`backend/data/livestock_template.xlsx`)
-- [x] Frontend skeleton (Vite + React + Tailwind + PWA)
-- [x] IndexedDB schema (Dexie.js — 6 tables with sync indexes)
-- [x] Backend skeleton (FastAPI + Google Sheets service)
+- SUPABASE_URL
+- SUPABASE_SERVICE_ROLE_KEY
+- SUPABASE_DB_SCHEMA
+- SUPABASE_STORAGE_BUCKET
+- SUPABASE_STORAGE_PREFIX
+- AUTH_TOKEN
+- CORS_ORIGINS
 
-### Phase 2: Core CRUD ✅
-- [x] Animal registration form + list view
-- [x] Animal detail view
-- [x] Offline data persistence (Dexie.js with _sync_status)
-- [ ] PIN authentication
-- [x] Bottom tab navigation (4 tabs + header)
+### Render
 
-### Phase 3: Extended Records ✅
-- [x] Health records CRUD
-- [x] Reproduction tracking CRUD
-- [x] Observations CRUD
-- [x] Sales CRUD
-- [x] Auto-computation (fecha_posible_parto +283 days, precio_kg)
-
-### Phase 4: Sync & Cloud ✅
-- [x] Google Sheets integration (`backend/app/services/sheets.py`)
-- [x] Bidirectional sync engine (last-write-wins merge)
-- [x] Sync UI (SyncButton, online/offline status, pending count)
-- [ ] Summary columns computation for Google Sheets
-
-### Phase 5: Analytics ← CURRENT
-- [x] Dashboard with key metrics (live count, health, repro, sales)
-- [ ] Reproductive calendar
-- [ ] Financial reports
-- [ ] Health alerts
-- [ ] Genealogical tree view
-
-### Phase 6: Polish
-- [ ] Photo support
-- [ ] iOS PWA install guide
-- [ ] Performance optimization
-- [ ] User testing with rancher
+Render deploys the FastAPI service from backend/ using requirements-render.txt.
+The deployment must provide the same Supabase variables used locally.
