@@ -7,6 +7,7 @@
 	import { formatStoredDate } from '$lib/date';
 	import { formatRecorridoTitle } from '$lib/recorridos';
 	import Card from '$lib/components/Card.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import type { Animal } from '$lib/types';
 
 	type ObservedItem = {
@@ -128,10 +129,10 @@
 					{@const photoSrc = photoMap.get(animal.animal_id)}
 					<Card class="flex items-center gap-3">
 						{#if photoSrc}
-							<img
+							<ZoomablePhoto
 								src={photoSrc}
 								alt={animal.nombre}
-								class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-green-200"
+								imgClass="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-green-200"
 							/>
 						{:else}
 							<div
@@ -175,10 +176,10 @@
 						{@const photoSrc = photoMap.get(animal.animal_id)}
 						<Card class="flex items-center gap-3 opacity-60">
 							{#if photoSrc}
-								<img
+								<ZoomablePhoto
 									src={photoSrc}
 									alt={animal.nombre}
-									class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-gray-200"
+									imgClass="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-gray-200"
 								/>
 							{:else}
 								<div

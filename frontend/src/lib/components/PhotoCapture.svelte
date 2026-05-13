@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Camera, Image as ImageIcon, X } from 'lucide-svelte';
 	import { compressImage } from '$lib/compressImage';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 
 	interface Props {
 		value: string;
@@ -38,7 +39,11 @@
 
 	{#if value}
 		<div class="relative">
-			<img src={value} alt="Foto del animal" class="h-48 w-full rounded-xl object-cover" />
+			<ZoomablePhoto
+				src={value}
+				alt="Foto del animal"
+				imgClass="h-48 w-full rounded-xl object-cover"
+			/>
 			<button
 				type="button"
 				onclick={handleRemove}

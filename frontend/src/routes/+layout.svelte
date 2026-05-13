@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import PhotoLightboxHost from '$lib/components/PhotoLightboxHost.svelte';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
@@ -10,3 +11,4 @@
 </script>
 
 {@render children()}
+<PhotoLightboxHost />

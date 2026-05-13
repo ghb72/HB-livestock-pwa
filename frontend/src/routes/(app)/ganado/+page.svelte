@@ -5,6 +5,7 @@
 	import Card from '$lib/components/Card.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
 	import { computeMissingAnimals, type MissingAnimalInfo } from '$lib/missingAnimals';
 	import type { Animal, AnimalTipo } from '$lib/types';
@@ -152,10 +153,10 @@
 				<Card onclick={() => goto(`/ganado/${animal.animal_id}`)}>
 					<div class="flex items-center gap-3">
 						{#if photoSrc}
-							<img
+							<ZoomablePhoto
 								src={photoSrc}
 								alt={animal.nombre}
-								class="h-12 w-12 shrink-0 rounded-full object-cover ring-2 {isMissing
+								imgClass="h-12 w-12 shrink-0 rounded-full object-cover ring-2 {isMissing
 									? 'ring-amber-400'
 									: 'ring-green-200'}"
 							/>

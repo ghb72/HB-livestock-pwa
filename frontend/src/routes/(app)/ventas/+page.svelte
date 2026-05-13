@@ -7,6 +7,7 @@
 	import { formatStoredDate } from '$lib/date';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import type { Sale } from '$lib/types';
 
 	let sales = $state<Sale[]>([]);
@@ -88,10 +89,10 @@
 				{@const animalName = animalMap.get(sale.animal_id) ?? sale.animal_id}
 				<Card class="flex items-center gap-3" onclick={() => goto(`/ganado/${sale.animal_id}`)}>
 					{#if photoSrc}
-						<img
+						<ZoomablePhoto
 							src={photoSrc}
 							alt={animalName}
-							class="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-amber-200"
+							imgClass="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-amber-200"
 						/>
 					{:else}
 						<div

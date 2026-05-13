@@ -13,6 +13,7 @@
 		AlertTriangle
 	} from 'lucide-svelte';
 	import Card from '$lib/components/Card.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { db } from '$lib/db';
 	import { formatStoredDate } from '$lib/date';
@@ -256,7 +257,12 @@
 		<!-- Photo -->
 		{#if photoSrc}
 			<div class="overflow-hidden rounded-xl">
-				<img src={photoSrc} alt={animal.nombre} class="h-52 w-full object-cover" />
+				<ZoomablePhoto
+					src={photoSrc}
+					alt={animal.nombre}
+					triggerClass="block w-full"
+					imgClass="h-52 w-full object-cover"
+				/>
 			</div>
 		{/if}
 
@@ -475,10 +481,10 @@
 										class="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2 transition-colors active:bg-gray-100"
 									>
 										{#if calf.photoSrc}
-											<img
+											<ZoomablePhoto
 												src={calf.photoSrc}
 												alt={calf.nombre}
-												class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-green-200"
+												imgClass="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-green-200"
 											/>
 										{:else}
 											<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700">

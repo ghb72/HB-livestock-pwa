@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, Save, Check, StickyNote, X, Loader2 } from 'lucide-svelte';
 	import FormField from '$lib/components/FormField.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
 	import { todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId } from '$lib/helpers';
@@ -281,10 +282,10 @@
 						<div class="flex items-center gap-1 px-3 py-2">
 							<div class="flex min-w-0 flex-1 items-center gap-3">
 								{#if photoSrc}
-									<img
+									<ZoomablePhoto
 										src={photoSrc}
 										alt={animal.nombre || 'Animal'}
-										class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-blue-100"
+										imgClass="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-blue-100"
 									/>
 								{:else}
 									<div

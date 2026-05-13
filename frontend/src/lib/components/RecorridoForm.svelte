@@ -17,6 +17,7 @@
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import type { Animal, RecorridoEntry } from '$lib/types';
 
 	interface Props {
@@ -227,10 +228,10 @@
 							<div class="flex items-center gap-3">
 								<div class="relative h-12 w-12 shrink-0">
 									{#if photoSrc}
-										<img
+										<ZoomablePhoto
 											src={photoSrc}
 											alt={animal.nombre || 'Animal'}
-											class="h-12 w-12 rounded-full object-cover ring-2 ring-gray-200"
+											imgClass="h-12 w-12 rounded-full object-cover ring-2 ring-gray-200"
 										/>
 									{:else}
 										<div
@@ -304,10 +305,10 @@
 							<div class="flex items-center gap-3">
 								<div class="relative h-12 w-12 shrink-0">
 									{#if photoSrc}
-										<img
+										<ZoomablePhoto
 											src={photoSrc}
 											alt={animal.nombre || 'Animal'}
-											class="h-12 w-12 rounded-full object-cover ring-2 ring-green-200"
+											imgClass="h-12 w-12 rounded-full object-cover ring-2 ring-green-200"
 										/>
 									{:else}
 										<div

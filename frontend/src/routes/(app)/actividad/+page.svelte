@@ -17,6 +17,7 @@
 	import { buildHealthBatches } from '$lib/health';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import type { ReproductionRecord, Observation } from '$lib/types';
 	import type { HealthBatch } from '$lib/health';
 
@@ -242,10 +243,10 @@
 						: undefined}
 				>
 					{#if item.type === 'reproduccion' && photoSrc}
-						<img
+						<ZoomablePhoto
 							src={photoSrc}
 							alt={item.animalName}
-							class="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-pink-200"
+							imgClass="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-pink-200"
 						/>
 					{:else if item.type === 'reproduccion'}
 						<div

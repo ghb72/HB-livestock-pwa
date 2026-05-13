@@ -2,6 +2,7 @@
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { NodeProps } from '@xyflow/svelte';
 	import type { FlowNodeData } from '$lib/genealogy';
+	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 
 	// NodeProps sin genérico → data: Record<string, unknown>; cast a FlowNodeData con $derived
 	const { id, data: rawData }: NodeProps = $props();
@@ -44,10 +45,10 @@
 	<!-- Fila superior: foto + info -->
 	<div class="flex items-start gap-3 min-h-0 flex-1">
 		{#if data.photoSrc}
-			<img
+			<ZoomablePhoto
 				src={data.photoSrc}
 				alt={data.nombre}
-				class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+				imgClass="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
 			/>
 		{:else}
 			<div
