@@ -27,6 +27,8 @@
     "workbox-window": "^7.4.0"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
+    "@xyflow/svelte": "^1.5.2",
     "date-fns": "^4.1.0",
     "dexie": "^4.4.2",
     "lucide-svelte": "^0.515.0",

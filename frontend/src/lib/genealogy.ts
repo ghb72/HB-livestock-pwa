@@ -1,4 +1,126 @@
+import dagre from '@dagrejs/dagre';
+import { MarkerType } from '@xyflow/svelte';
 import type { Animal, AnimalPhoto, EstadoAnimal, ReproductionRecord } from '$lib/types';
+
+// Dimensiones del nodo custom en el canvas de SvelteFlow
+export const FLOW_NODE_WIDTH = 200;
+export const FLOW_NODE_HEIGHT = 136;
+
+// Tipos de nodo/edge para @xyflow/svelte
+export interface FlowNodeData extends Record<string, unknown> {
+	nombre: string;
+	areteId: string;
+	tipo: Animal['tipo'];
+	estado: EstadoAnimal;
+	photoSrc: string;
+	isFocus: boolean;
+	onCenter: (id: string) => void;
+	onFicha: (id: string) => void;
+}
+
+export interface FlowNode {
+	id: string;
+	type: 'genealogy';
+	position: { x: number; y: number };
+	data: FlowNodeData;
+	width: number;
+	height: number;
+}
+
+export interface FlowEdge {
+	id: string;
+	source: string;
+	target: string;
+	type: 'smoothstep';
+	animated: boolean;
+	style: string;
+	markerEnd?: { type: MarkerType; color?: string; width?: number; height?: number };
+}
+
+export interface FlowLayout {
+	nodes: FlowNode[];
+	edges: FlowEdge[];
+}
+
+/**
+ * Construye nodos y edges en formato @xyflow/svelte con posiciones calculadas por dagre.
+ * Si focusId es null, incluye todos los animales del source.
+ */
+export function buildFlowLayout(
+	source: GenealogySource,
+	focusId: string | null,
+	maxDepth = 3,
+	callbacks: { onCenter: (id: string) => void; onFicha: (id: string) => void }
+): FlowLayout {
+	let rawNodes: Array<{ id: string; isFocus: boolean }>;
+	let rawEdges: GenealogyEdge[];
+
+	if (focusId) {
+		const graph = buildGenealogyGraph(source, focusId, maxDepth);
+		if (!graph) return { nodes: [], edges: [] };
+		rawNodes = graph.nodes.map((n) => ({ id: n.id, isFocus: n.isFocus }));
+		rawEdges = graph.edges;
+	} else {
+		rawNodes = source.animals.map((a) => ({ id: a.animal_id, isFocus: false }));
+		rawEdges = source.edges;
+	}
+
+	// Layout con dagre
+	const g = new dagre.graphlib.Graph();
+	g.setGraph({ rankdir: 'TB', nodesep: 48, ranksep: 80, marginx: 24, marginy: 24 });
+	g.setDefaultEdgeLabel(() => ({}));
+
+	for (const n of rawNodes) {
+		g.setNode(n.id, { width: FLOW_NODE_WIDTH, height: FLOW_NODE_HEIGHT });
+	}
+	for (const e of rawEdges) {
+		g.setEdge(e.from, e.to, { id: e.id });
+	}
+
+	dagre.layout(g);
+
+	const nodes: FlowNode[] = rawNodes.map((n) => {
+		const pos = g.node(n.id);
+		const animal = source.animalsById.get(n.id);
+		return {
+			id: n.id,
+			type: 'genealogy',
+			position: {
+				x: pos.x - FLOW_NODE_WIDTH / 2,
+				y: pos.y - FLOW_NODE_HEIGHT / 2
+			},
+			data: {
+				nombre: animal?.nombre ?? '?',
+				areteId: animal?.arete_id ?? '',
+				tipo: animal?.tipo ?? 'Vaca',
+				estado: animal?.estado ?? 'Vivo(a)',
+				photoSrc: animal?.photoSrc ?? '',
+				isFocus: n.isFocus,
+				onCenter: callbacks.onCenter,
+				onFicha: callbacks.onFicha
+			},
+			width: FLOW_NODE_WIDTH,
+			height: FLOW_NODE_HEIGHT
+		};
+	});
+
+	const edges: FlowEdge[] = rawEdges.map((e) => {
+		const isMadre = e.relation === 'madre-hijo';
+		return {
+			id: e.id,
+			source: e.from,
+			target: e.to,
+			type: 'smoothstep',
+			animated: false,
+			style: isMadre
+				? 'stroke: #f472b6; stroke-width: 2.5px;'
+				: 'stroke: #f472b6; stroke-width: 2px; stroke-dasharray: 7 5;',
+			markerEnd: { type: MarkerType.ArrowClosed, color: '#f472b6', width: 18, height: 18 }
+		};
+	});
+
+	return { nodes, edges };
+}
 
 export type GenealogyRelation = 'madre-hijo' | 'padre-hijo';
 
