@@ -44,3 +44,6 @@ Thumbs.db
 
 # Generated data
 backend/data/*.xlsx
+node_modules
+.vercel
+.env*.local

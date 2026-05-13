@@ -137,7 +137,7 @@ You can start from frontend/.env.development.example and frontend/.env.productio
 
 ## Production Deployment
 
-- Frontend (Vercel): uses root vercel.json and the frontend project
+- Frontend (Vercel): set Root Directory to frontend so Vercel uses frontend/vercel.json and builds from frontend/
 - Backend (Render): uses root render.yaml with rootDir: backend
 - Backend deps: backend/requirements-render.txt
 
@@ -146,7 +146,7 @@ You can start from frontend/.env.development.example and frontend/.env.productio
 1. Connect this repository in Render and create a Blueprint service from render.yaml.
 2. In Render service settings, add SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and AUTH_TOKEN.
 3. Optionally override SUPABASE_DB_SCHEMA, SUPABASE_STORAGE_BUCKET, and SUPABASE_STORAGE_PREFIX.
-4. Connect the same repository in Vercel.
+4. Connect the same repository in Vercel and set Root Directory to frontend.
 5. In Vercel project environment variables, set VITE_API_URL=https://<your-render-service>.onrender.com.
 6. Redeploy both services after env vars are configured.
 
