@@ -4,10 +4,7 @@
 	import { ArrowLeft, GitBranch, X } from 'lucide-svelte';
 	import { SvelteFlow, Background } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import SearchBar from '$lib/components/SearchBar.svelte';
-	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { db } from '$lib/db';
 	import { createGenealogySource, buildFlowLayout } from '$lib/genealogy';
 	import type { Animal, AnimalPhoto, EstadoAnimal, ReproductionRecord } from '$lib/types';
@@ -16,8 +13,6 @@
 	const nodeTypes = { genealogy: GenealogyFlowNode };
 
 	let loading = $state(true);
-	let search = $state('');
-	let stateFilter = $state<EstadoAnimal | ''>('');
 	let maxDepth = $state(3);
 	let animals = $state<Animal[]>([]);
 	let photos = $state<AnimalPhoto[]>([]);
@@ -47,19 +42,6 @@
 
 	const source = $derived(createGenealogySource(animals, photos, reproduction));
 
-	const filteredAnimals = $derived.by(() => {
-		const normalizedSearch = search.trim().toLowerCase();
-		return source.animals.filter((animal) => {
-			const matchesSearch =
-				!normalizedSearch ||
-				animal.nombre.toLowerCase().includes(normalizedSearch) ||
-				animal.arete_id.toLowerCase().includes(normalizedSearch) ||
-				animal.animal_id.toLowerCase().includes(normalizedSearch);
-			const matchesState = !stateFilter || animal.estado === stateFilter;
-			return matchesSearch && matchesState;
-		});
-	});
-
 	const selectedAnimal = $derived(
 		selectedAnimalId ? source.animalsById.get(selectedAnimalId) : undefined
 	);
@@ -86,7 +68,6 @@
 
 	const flowKey = $derived(`${selectedAnimalId}-${maxDepth}`);
 
-	const STATE_FILTERS: Array<EstadoAnimal | ''> = ['', 'Vivo(a)', 'Muerto(a)', 'Vendido(a)'];
 	const DEPTH_OPTIONS = [1, 2, 3, 4];
 </script>
 
@@ -112,23 +93,6 @@
 		</div>
 	</div>
 
-	<!-- Búsqueda + filtros de estado -->
-	<SearchBar value={search} onchange={(value) => (search = value)} />
-
-	<div class="flex flex-wrap gap-2">
-		{#each STATE_FILTERS as filter}
-			<button
-				type="button"
-				onclick={() => (stateFilter = filter)}
-				class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors {stateFilter === filter
-					? 'bg-green-600 text-white'
-					: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
-			>
-				{filter || 'Todos'}
-			</button>
-		{/each}
-	</div>
-
 	<!-- Panel: nodo foco -->
 	<div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
 		<div class="flex flex-wrap items-center justify-between gap-3">
@@ -140,7 +104,7 @@
 							? ` · #${selectedAnimal.arete_id}`
 							: ''}
 					{:else}
-						Selecciona una res de la lista para centrar el grafo.
+						Toca una tarjeta del grafo para centrar la familia en esa res.
 					{/if}
 				</p>
 			</div>
@@ -232,48 +196,5 @@
 				</SvelteFlow>
 			</div>
 		{/key}
-
-		<!-- Lista de selección (solo cuando no hay foco) -->
-		{#if !selectedAnimal}
-			<div class="space-y-2 pt-2">
-				<p class="text-xs font-semibold uppercase tracking-widest text-gray-400">
-					Selecciona una res para centrar
-				</p>
-				{#if filteredAnimals.length > 0}
-					{#each filteredAnimals.slice(0, 12) as animal (animal.animal_id)}
-						<Card onclick={() => focusAnimal(animal.animal_id)}>
-							<div class="flex items-center gap-3">
-								{#if animal.photoSrc}
-									<img
-										src={animal.photoSrc}
-										alt={animal.nombre}
-										class="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-gray-100"
-									/>
-								{:else}
-									<div
-										class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-100 text-lg font-bold text-gray-500"
-									>
-										{animal.nombre?.charAt(0)?.toUpperCase() ?? '?'}
-									</div>
-								{/if}
-								<div class="min-w-0 flex-1">
-									<div class="flex items-center gap-2">
-										<p class="truncate font-semibold text-gray-800">{animal.nombre}</p>
-										<StatusBadge estado={animal.estado} />
-									</div>
-									<p class="text-xs text-gray-500">
-										#{animal.arete_id || '—'} · {animal.tipo}
-									</p>
-								</div>
-							</div>
-						</Card>
-					{/each}
-				{:else}
-					<p class="py-4 text-center text-sm text-gray-400">
-						No se encontraron reses con ese filtro.
-					</p>
-				{/if}
-			</div>
-		{/if}
 	{/if}
 </div>

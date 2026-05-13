@@ -20,13 +20,25 @@
 		if (estado === 'Vendido(a)') return 'border-amber-200 bg-amber-50/60';
 		return 'border-gray-200 bg-white';
 	}
+
+	function handleNodeKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		data.onCenter(id);
+	}
 </script>
 
 <!-- Entrada -->
 <Handle type="target" position={Position.Top} class="!w-2 !h-2 !bg-pink-400 !border-white !border" />
 
 <div
+	role="button"
+	tabindex="0"
+	aria-label={`Centrar en ${data.nombre}`}
+	onclick={() => data.onCenter(id)}
+	onkeydown={handleNodeKeydown}
 	class="flex w-full h-full flex-col rounded-2xl border p-3 ring-2 shadow-sm
+		cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-pink-200
 		{ringColor(data.estado, data.isFocus)} {bgStyle(data.estado, data.isFocus)}"
 >
 	<!-- Fila superior: foto + info -->
@@ -58,14 +70,20 @@
 	<div class="mt-2 flex gap-2">
 		<button
 			type="button"
-			onclick={() => data.onCenter(id)}
+			onclick={(event) => {
+				event.stopPropagation();
+				data.onCenter(id);
+			}}
 			class="flex-1 rounded-full bg-gray-100 py-1.5 text-center text-[11px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
 		>
 			Centrar
 		</button>
 		<button
 			type="button"
-			onclick={() => data.onFicha(id)}
+			onclick={(event) => {
+				event.stopPropagation();
+				data.onFicha(id);
+			}}
 			class="flex-1 rounded-full bg-green-50 py-1.5 text-center text-[11px] font-semibold text-green-700 hover:bg-green-100 transition-colors"
 		>
 			Ficha
