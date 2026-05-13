@@ -19,7 +19,6 @@ See AUTHENTICATION_GUIDE.md for the formal reusable authentication guide and imp
 ## Project Structure
 
 - frontend/: PWA client application
-- frontend-react/: archived React implementation kept as migration reference
 - backend/: FastAPI API and sync services
 - backend/data/: template and support data files
 - backend/scripts/: helper scripts

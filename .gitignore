@@ -23,7 +23,6 @@ frontend/.env.*
 
 
 # React Frontend
-frontend-react/
 
 # Python
 __pycache__/
