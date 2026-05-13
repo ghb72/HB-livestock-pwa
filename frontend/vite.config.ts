@@ -29,9 +29,6 @@ export default defineConfig({
 		sveltekit(),
 		SvelteKitPWA({
 			injectRegister: false,
-			kit: {
-				spa: true
-			},
 			registerType: 'autoUpdate',
 			manifest: {
 				name: 'HB Registro Ganadero',
