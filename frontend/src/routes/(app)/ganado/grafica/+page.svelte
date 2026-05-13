@@ -183,9 +183,12 @@
 					{nodeTypes}
 					fitView
 					fitViewOptions={{ padding: 0.2 }}
-					panOnDrag={false}
-					zoomOnScroll={false}
-					zoomOnPinch={false}
+					minZoom={0.6}
+					maxZoom={1.8}
+					panOnDrag={true}
+					zoomOnScroll={true}
+					zoomOnPinch={true}
+					zoomOnDoubleClick={false}
 					preventScrolling={false}
 					nodesDraggable={false}
 					nodesConnectable={false}
