@@ -2,6 +2,7 @@
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { NodeProps } from '@xyflow/svelte';
 	import type { FlowNodeData } from '$lib/genealogy';
+	import { formatTagId } from '$lib/helpers';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 
 	// NodeProps sin genérico → data: Record<string, unknown>; cast a FlowNodeData con $derived
@@ -60,9 +61,7 @@
 
 		<div class="min-w-0 flex-1 pt-0.5">
 			<p class="truncate text-sm font-bold leading-tight text-gray-800">{data.nombre}</p>
-			<p class="mt-0.5 truncate text-xs text-gray-500">
-				{data.areteId ? `#${data.areteId}` : '—'}
-			</p>
+			<p class="mt-0.5 truncate text-xs text-gray-500">{formatTagId(data.areteId) || '—'}</p>
 			<p class="mt-0.5 truncate text-xs text-gray-400">{data.tipo}</p>
 		</div>
 	</div>

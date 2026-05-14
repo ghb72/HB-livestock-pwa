@@ -5,6 +5,7 @@
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
 	import { formatStoredDate } from '$lib/date';
+	import { formatTagId } from '$lib/helpers';
 	import { formatRecorridoTitle } from '$lib/recorridos';
 	import Card from '$lib/components/Card.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
@@ -146,7 +147,7 @@
 								{animal.nombre || 'Sin nombre'}
 							</span>
 							<span class="ml-2 text-xs text-gray-400">
-								#{animal.arete_id || '—'}
+								{formatTagId(animal.arete_id) || '—'}
 							</span>
 							{#if note}
 								<p class="text-xs text-gray-500">{note}</p>
@@ -193,7 +194,7 @@
 									{animal.nombre || 'Sin nombre'}
 								</span>
 								<span class="ml-2 text-xs text-gray-400">
-									#{animal.arete_id || '—'}
+									{formatTagId(animal.arete_id) || '—'}
 								</span>
 							</div>
 							<div

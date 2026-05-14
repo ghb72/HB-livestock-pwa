@@ -4,7 +4,7 @@
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
 	import { todayLocalDate } from '$lib/date';
-	import { generateId, now, currentUserId } from '$lib/helpers';
+	import { generateId, now, currentUserId, formatTagId } from '$lib/helpers';
 	import type { Animal, TipoEventoSalud, EstadoGeneral, HealthRecord } from '$lib/types';
 
 	const TIPOS_EVENTO: TipoEventoSalud[] = [
@@ -296,7 +296,7 @@
 								{/if}
 								<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-semibold text-gray-800">
-									{animal.nombre || animal.arete_id}
+									{animal.nombre || formatTagId(animal.arete_id) || animal.animal_id}
 								</p>
 								<p class="truncate text-xs text-gray-400">{animal.animal_id}</p>
 								</div>

@@ -5,6 +5,7 @@
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
 	import { formatStoredDate } from '$lib/date';
+	import { formatTagId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
@@ -29,7 +30,9 @@
 			db.photos.toArray()
 		]);
 		sales = allSales.sort((a, b) => b.fecha_venta.localeCompare(a.fecha_venta));
-		animalMap = new Map(allAnimals.map((a) => [a.animal_id, a.nombre || a.arete_id]));
+		animalMap = new Map(
+			allAnimals.map((a) => [a.animal_id, a.nombre || formatTagId(a.arete_id) || a.animal_id])
+		);
 
 		const photos = new Map<string, string>();
 		for (const animal of allAnimals) {

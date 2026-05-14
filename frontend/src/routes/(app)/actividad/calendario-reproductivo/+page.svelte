@@ -21,6 +21,7 @@
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
+	import { formatTagId } from '$lib/helpers';
 	import type { Animal, ReproductionRecord } from '$lib/types';
 
 	// ── Constants ──
@@ -507,7 +508,7 @@
 										.dot}"
 								></span>
 								<span class="font-medium text-gray-800">
-									{cow.nombre || cow.arete_id}
+									{cow.nombre || formatTagId(cow.arete_id) || cow.animal_id}
 								</span>
 							</button>
 							<span class="text-xs text-red-700">{semaforoLabel}</span>
@@ -535,7 +536,7 @@
 							<Baby size={16} class="shrink-0 text-pink-400" />
 							<div class="min-w-0 flex-1">
 								<p class="font-medium text-gray-800">
-									{cow.nombre || cow.arete_id}
+									{cow.nombre || formatTagId(cow.arete_id) || cow.animal_id}
 								</p>
 								<p class="text-xs text-gray-500">{semaforoLabel}</p>
 							</div>
@@ -583,10 +584,10 @@
 							></span>
 							<div class="min-w-0 flex-1">
 								<p class="truncate font-medium text-gray-800">
-									{cs.cow.nombre || cs.cow.arete_id}
+									{cs.cow.nombre || formatTagId(cs.cow.arete_id) || cs.cow.animal_id}
 								</p>
 								<p class="truncate text-xs text-gray-400">
-									{cs.cow.arete_id}
+									{formatTagId(cs.cow.arete_id) || '—'}
 									{#if cs.lastPartoDate}
 										{' '}· Último parto: {formatD(cs.lastPartoDate)}
 									{/if}
@@ -663,7 +664,7 @@
 										class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500"
 									>
 										Historial reproductivo ({selectedStatus.cow.nombre ||
-											selectedStatus.cow.arete_id})
+											formatTagId(selectedStatus.cow.arete_id) || selectedStatus.cow.animal_id})
 									</p>
 									{#if selectedStatus.records.length === 0}
 										<p class="text-sm text-gray-400">Sin registros.</p>

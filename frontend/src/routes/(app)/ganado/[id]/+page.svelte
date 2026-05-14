@@ -109,13 +109,13 @@
 		// Parents
 		if (a.madre_id) {
 			const m = await db.animals.get(a.madre_id);
-			motherName = m ? `${m.nombre} (${m.arete_id})` : a.madre_id;
+			motherName = m ? `${m.nombre} (${formatTagId(m.arete_id) || '—'})` : a.madre_id;
 		} else {
 			motherName = '—';
 		}
 		if (a.padre_id) {
 			const f = await db.animals.get(a.padre_id);
-			fatherName = f ? `${f.nombre} (${f.arete_id})` : a.padre_id;
+			fatherName = f ? `${f.nombre} (${formatTagId(f.arete_id) || '—'})` : a.padre_id;
 		} else {
 			fatherName = '—';
 		}
@@ -322,7 +322,7 @@
 						<ul class="mt-2 space-y-1 text-xs text-gray-600">
 							{#each offspring.slice(0, 4) as calf (calf.animal_id)}
 								<li class="truncate">
-									{calf.nombre}{calf.arete_id ? ` (#${calf.arete_id})` : ''}
+									{calf.nombre}{calf.arete_id ? ` (${formatTagId(calf.arete_id)})` : ''}
 								</li>
 							{/each}
 						</ul>
@@ -494,7 +494,7 @@
 										<div class="min-w-0 flex-1">
 											<p class="truncate font-medium text-gray-800">{calf.nombre}</p>
 											<p class="text-xs text-gray-500">
-												{calf.arete_id ? `#${calf.arete_id}` : 'Sin arete'}
+												{formatTagId(calf.arete_id) || 'Sin arete'}
 											</p>
 										</div>
 									</a>

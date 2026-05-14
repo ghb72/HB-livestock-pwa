@@ -5,6 +5,7 @@
 	import SelectField from './SelectField.svelte';
 	import PhotoCapture from './PhotoCapture.svelte';
 	import { db } from '$lib/db';
+	import { formatTagId } from '$lib/helpers';
 	import {
 		createAnimal,
 		updateAnimal,
@@ -75,7 +76,7 @@
 			)
 			.map((a) => ({
 				value: a.animal_id,
-				label: `${a.nombre} ${a.arete_id}`.trim()
+				label: `${a.nombre} ${formatTagId(a.arete_id)}`.trim()
 			}));
 		fathers = allAnimals
 			.filter(
@@ -83,7 +84,7 @@
 			)
 			.map((a) => ({
 				value: a.animal_id,
-				label: `${a.nombre} ${a.arete_id}`.trim()
+				label: `${a.nombre} ${formatTagId(a.arete_id)}`.trim()
 			}));
 	}
 

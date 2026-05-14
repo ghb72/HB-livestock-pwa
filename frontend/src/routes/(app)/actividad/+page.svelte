@@ -14,6 +14,7 @@
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
 	import { formatStoredDate } from '$lib/date';
+	import { formatTagId } from '$lib/helpers';
 	import { buildHealthBatches } from '$lib/health';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
@@ -50,8 +51,10 @@
 			db.photos.toArray()
 		]);
 
-		animalMap = new Map(animals.map((a) => [a.animal_id, a.nombre || a.arete_id]));
-		animalTagMap = new Map(animals.map((a) => [a.animal_id, a.arete_id || '—']));
+		animalMap = new Map(
+			animals.map((a) => [a.animal_id, a.nombre || formatTagId(a.arete_id) || a.animal_id])
+		);
+		animalTagMap = new Map(animals.map((a) => [a.animal_id, formatTagId(a.arete_id) || '—']));
 
 		const nextPhotoMap = new Map<string, string>();
 		for (const animal of animals) {
@@ -203,7 +206,7 @@
 									<tr class="border-b border-gray-50 last:border-b-0">
 										<td class="px-2 py-2 align-top">
 											<p class="font-medium text-gray-800">{row.animalName}</p>
-											<p class="text-xs text-gray-400">#{row.animalTag}</p>
+											<p class="text-xs text-gray-400">{row.animalTag}</p>
 										</td>
 										{#each batch.eventTypes as eventType}
 											<td class="px-2 py-2 text-center align-top">

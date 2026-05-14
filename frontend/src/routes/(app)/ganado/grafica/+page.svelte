@@ -7,6 +7,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { db } from '$lib/db';
 	import { createGenealogySource, buildFlowLayout } from '$lib/genealogy';
+	import { formatTagId } from '$lib/helpers';
 	import type { Animal, AnimalPhoto, EstadoAnimal, ReproductionRecord } from '$lib/types';
 	import GenealogyFlowNode from './GenealogyFlowNode.svelte';
 
@@ -101,7 +102,7 @@
 				<p class="truncate text-xs text-gray-500">
 					{#if selectedAnimal}
 						{selectedAnimal.nombre}{selectedAnimal.arete_id
-							? ` · #${selectedAnimal.arete_id}`
+							? ` · ${formatTagId(selectedAnimal.arete_id)}`
 							: ''}
 					{:else}
 						Toca una tarjeta del grafo para centrar la familia en esa res.

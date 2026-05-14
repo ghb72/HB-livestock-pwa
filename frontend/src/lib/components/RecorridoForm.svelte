@@ -15,7 +15,7 @@
 	import { db } from '$lib/db';
 	import DateField from '$lib/components/DateField.svelte';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
-	import { generateId, now, currentUserId } from '$lib/helpers';
+	import { generateId, now, currentUserId, formatTagId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import type { Animal, RecorridoEntry } from '$lib/types';
@@ -257,7 +257,7 @@
 											{animal.nombre || 'Sin nombre'}
 										</span>
 										<span class="shrink-0 text-xs text-gray-400">
-											#{animal.arete_id || '—'}
+											{formatTagId(animal.arete_id) || '—'}
 										</span>
 									</div>
 									<div class="flex gap-2 text-xs text-gray-500">
@@ -334,7 +334,7 @@
 											{animal.nombre || 'Sin nombre'}
 										</span>
 										<span class="shrink-0 text-xs text-gray-400">
-											#{animal.arete_id || '—'}
+											{formatTagId(animal.arete_id) || '—'}
 										</span>
 									</div>
 									<div class="flex gap-2 text-xs text-gray-500">
