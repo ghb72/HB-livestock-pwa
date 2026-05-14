@@ -913,12 +913,18 @@
 
 								<!-- Reproductive history -->
 								<div>
-									<p
-										class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500"
-									>
-										Historial reproductivo ({selectedStatus.cow.nombre ||
-											formatTagId(selectedStatus.cow.arete_id) || selectedStatus.cow.animal_id})
-									</p>
+									<div class="mb-2 flex items-center justify-between gap-3">
+										<p class="text-xs font-bold uppercase tracking-wider text-gray-500">
+											Historial reproductivo ({selectedStatus.cow.nombre ||
+												formatTagId(selectedStatus.cow.arete_id) || selectedStatus.cow.animal_id})
+										</p>
+										<a
+											href="/actividad/reproduccion/nuevo?animal={selectedStatus.cow.animal_id}"
+											class="shrink-0 rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-pink-700 transition-colors hover:bg-pink-100"
+										>
+											Nuevo evento
+										</a>
+									</div>
 									{#if selectedStatus.records.length === 0}
 										<p class="text-sm text-gray-400">Sin registros.</p>
 									{:else}
