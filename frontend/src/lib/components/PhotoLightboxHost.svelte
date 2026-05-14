@@ -32,13 +32,9 @@
 		swallowEvent(event);
 	}
 
-	function handleClosePointerDown(event: PointerEvent) {
-		swallowEvent(event);
-		closePhotoLightbox();
-	}
-
 	function handleCloseClick(event: MouseEvent) {
 		swallowEvent(event);
+		closePhotoLightbox();
 	}
 </script>
 
@@ -49,12 +45,12 @@
 		aria-modal="true"
 		tabindex="-1"
 		onpointerdown={swallowEvent}
+		onpointerup={swallowEvent}
 		onclick={swallowEvent}
 		onkeydown={swallowKeydown}
 	>
 		<button
 			type="button"
-			onpointerdown={handleClosePointerDown}
 			onclick={handleCloseClick}
 			class="absolute right-4 top-4 z-30 rounded-full bg-white/14 p-2 text-white backdrop-blur-sm transition-colors hover:bg-white/24"
 			aria-label="Cerrar vista ampliada"
