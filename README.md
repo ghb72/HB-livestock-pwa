@@ -1,6 +1,8 @@
-# HB Livestock PWA
+# HB Livestock PWA v2.1.0
 
 Offline-first Progressive Web App for livestock management.
+
+Current release: 2.1.0.
 
 ## Overview
 
@@ -128,12 +130,14 @@ You can start from frontend/.env.development.example and frontend/.env.productio
 - After login, the PWA runs fully client-side and stores operational data in IndexedDB.
 - IndexedDB schema v3 adds `madre_id` and `padre_id` indexes to support genealogy and offspring queries without Dexie schema errors. Reload the app once after upgrading so the local database can migrate.
 - Sync is visibility-aware: when the app is visible and authenticated, it polls remote state, skips unnecessary pulls, and protects unsynced local changes.
+- Creating or updating an animal with an existing mother can now generate or synchronize an inferred birth record automatically so reproduction views stay aligned with genealogy data.
 - Genealogy views are computed locally from IndexedDB animal, reproduction, and photo data; the graphical explorer supports focus changes, generation depth control, and pan/zoom without extra backend calls.
 - Date-heavy forms now use a shared `DD/MM/YYYY` input with native date-picker fallback to keep stored values consistent across pages.
 - Photos can be opened in a shared zoom/lightbox flow from herd, activity, sales, recorrido, and animal detail screens.
 - Photos are first stored locally, then uploaded to Supabase Storage during sync.
 - The photo upload and deletion flow now runs entirely through `backend/app/services/supabase.py`, even if older compatibility imports still exist in the backend.
 - The backend talks to Supabase over HTTP using the service role key, so no Supabase Python SDK is required.
+- The reproductive calendar now includes vacant-cow, near-weaning, and ideal-heat-window indicators, plus calf detail links and thumbnails inside reproductive history tables.
 
 ## Production Deployment
 

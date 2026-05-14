@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-13
+
+### Added
+
+- Added automatic inferred birth-record creation when a new animal is registered with an existing mother, including edit-mode synchronization for later maternal assignment changes.
+- Added richer reproductive-intelligence overlays, including vacant-cow lists, ideal-heat-window lists, near-weaning indicators, and contextual reference guidance for traditional weaning targets.
+- Added direct reproductive-event shortcuts from cow cards and linked calf rows in reproductive history with calf name, tag, and thumbnail previews.
+
+### Changed
+
+- Updated the reproductive activity feed and calendar views to treat inferred births as first-class birth events with birth-date-based labeling and ordering.
+- Expanded reproductive history presentation so calf references resolve to local animal records instead of raw identifiers when available.
+
 ## [2.0.0] - 2026-05-13
 
 ### Added
