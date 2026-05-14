@@ -29,6 +29,8 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 let isSyncing = false;
 let lastKnownSyncState: ApiSyncState | null = null;
 
+const REMOTE_PHOTO_CACHE_LIMIT = 150;
+
 export type SyncStatus = 'syncing' | 'offline' | 'synced';
 
 function dispatchSyncStatus(status: SyncStatus): void {
@@ -237,6 +239,49 @@ async function pullAndApplyAll(): Promise<void> {
 	}
 }
 
+function preloadImage(url: string): Promise<void> {
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.decoding = 'async';
+		img.loading = 'eager';
+		img.onload = () => resolve();
+		img.onerror = () => resolve();
+		img.src = url;
+	});
+}
+
+async function warmRemotePhotoCache(): Promise<void> {
+	if (typeof Image === 'undefined' || typeof navigator === 'undefined' || !navigator.onLine) return;
+
+	const [animals, photos] = await Promise.all([
+		db.animals.where('deleted').equals(0).toArray(),
+		db.photos.where('deleted').equals(0).toArray()
+	]);
+
+	const cachedPhotoUrls = new Set(
+		photos.filter((photo) => !!photo.data_url).map((photo) => photo.drive_url).filter(Boolean)
+	);
+
+	const remoteUrls = new Set<string>();
+	for (const animal of animals) {
+		if (animal.foto_url && !cachedPhotoUrls.has(animal.foto_url)) {
+			remoteUrls.add(animal.foto_url);
+		}
+	}
+	for (const photo of photos) {
+		if (photo.drive_url && !photo.data_url) {
+			remoteUrls.add(photo.drive_url);
+		}
+	}
+
+	let warmed = 0;
+	for (const url of remoteUrls) {
+		await preloadImage(url);
+		warmed += 1;
+		if (warmed >= REMOTE_PHOTO_CACHE_LIMIT) break;
+	}
+}
+
 // ── Core sync orchestrator ───────────────────────────────
 
 export async function syncAll(forceRemotePull = false): Promise<void> {
@@ -281,6 +326,7 @@ export async function syncAll(forceRemotePull = false): Promise<void> {
 
 		// Single batch pull for all tables (1 API call → backend reads all sheets at once)
 		await pullAndApplyAll();
+		await warmRemotePhotoCache();
 
 		nextSyncState = await apiGetSyncState().catch(() => null);
 		lastKnownSyncState = nextSyncState;

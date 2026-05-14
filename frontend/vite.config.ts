@@ -31,7 +31,7 @@ export default defineConfig({
 			injectRegister: false,
 			registerType: 'autoUpdate',
 			manifest: {
-				name: 'HB Registro Ganadero',
+				name: 'Ganado La Escondida',
 				short_name: 'Ganado',
 				description: 'Registro ganadero offline-first para manejo de hato',
 				start_url: '/',
@@ -64,6 +64,15 @@ export default defineConfig({
 				additionalManifestEntries: [{ url: '/', revision: appShellRevision }],
 				globPatterns: ['client/**/*.{js,css,html,svg,ico,woff,woff2,png}'],
 				runtimeCaching: [
+					{
+						urlPattern: ({ request }) => request.destination === 'image',
+						handler: 'CacheFirst',
+						options: {
+							cacheName: 'image-cache',
+							cacheableResponse: { statuses: [0, 200] },
+							expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 }
+						}
+					},
 					{
 						urlPattern: /^https?:\/\/.*\/api\//,
 						handler: 'NetworkFirst',
