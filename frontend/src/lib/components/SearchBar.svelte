@@ -32,3 +32,19 @@
 		</button>
 	{/if}
 </div>
+
+<style>
+	input[type='search']::-webkit-search-decoration,
+	input[type='search']::-webkit-search-cancel-button,
+	input[type='search']::-webkit-search-results-button,
+	input[type='search']::-webkit-search-results-decoration {
+		appearance: none;
+	}
+
+	input[type='search']::-ms-clear,
+	input[type='search']::-ms-reveal {
+		display: none;
+		width: 0;
+		height: 0;
+	}
+</style>
