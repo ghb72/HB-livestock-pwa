@@ -1,14 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
+	import { format, subDays } from 'date-fns';
 	import FormField from './FormField.svelte';
 	import SelectField from './SelectField.svelte';
 	import PhotoCapture from './PhotoCapture.svelte';
 	import { db } from '$lib/db';
+	import { parseStoredDate, todayLocalDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import {
 		createAnimal,
+		createReproductionRecord,
+		deleteReproductionRecord,
 		updateAnimal,
+		updateReproductionRecord,
 		getAnimal,
 		getPhotos,
 		addPhoto,
@@ -24,6 +29,9 @@
 	interface Props {
 		animalId?: string;
 	}
+
+	const GESTATION_DAYS = 283;
+	const INFERRED_BIRTH_NOTE = 'Parto inferido automaticamente desde el registro del animal.';
 
 	let { animalId }: Props = $props();
 
@@ -118,6 +126,48 @@
 		initialized = true;
 	}
 
+	async function syncInferredBirthRecord(animalId: string, pesoActual: number | null) {
+		const existingBirth = await db.reproduction
+			.where('deleted')
+			.equals(0)
+			.filter((record) => record.cria_id === animalId && !!record.fecha_parto_real)
+			.first();
+
+		const motherId = form.madre_id.trim();
+		if (!motherId) {
+			if (existingBirth?.notas === INFERRED_BIRTH_NOTE) {
+				await deleteReproductionRecord(existingBirth.reproduccion_id);
+			}
+			return;
+		}
+
+		if (existingBirth && existingBirth.notas !== INFERRED_BIRTH_NOTE) return;
+
+		const birthDate = form.fecha_nacimiento || todayLocalDate();
+		const parsedBirthDate = parseStoredDate(birthDate);
+		const inferredMatingDate = parsedBirthDate
+			? format(subDays(parsedBirthDate, GESTATION_DAYS), 'yyyy-MM-dd')
+			: '';
+		const reproductionPayload = {
+			vaca_id: motherId,
+			semental_id: form.padre_id.trim(),
+			fecha_monta: inferredMatingDate,
+			fecha_posible_parto: birthDate,
+			prenez_confirmada: 'Sí' as const,
+			fecha_parto_real: birthDate,
+			cria_id: animalId,
+			peso_destete_cria: pesoActual,
+			notas: INFERRED_BIRTH_NOTE
+		};
+
+		if (existingBirth) {
+			await updateReproductionRecord(existingBirth.reproduccion_id, reproductionPayload);
+			return;
+		}
+
+		await createReproductionRecord(reproductionPayload);
+	}
+
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		if (saving) return;
@@ -133,6 +183,8 @@
 					padre_id: form.padre_id,
 					peso_actual: peso
 				});
+
+				await syncInferredBirthRecord(animalId, peso);
 
 				if (photoData && photoData.startsWith('data:')) {
 					const existing = await getPhotos(animalId);
@@ -153,6 +205,8 @@
 					padre_id: form.padre_id,
 					peso_actual: peso
 				});
+
+				await syncInferredBirthRecord(animal.animal_id, peso);
 
 				if (photoData && photoData.startsWith('data:')) {
 					await addPhoto(animal.animal_id, photoData);

@@ -75,10 +75,18 @@
 		activities = [
 			...reproRecords.map((r) => ({
 				id: r.reproduccion_id,
-				date: r.fecha_monta,
+				date: r.fecha_parto_real || r.fecha_monta,
 				type: 'reproduccion' as const,
-				title: r.prenez_confirmada === 'Sí' ? 'Preñez confirmada' : 'Monta registrada',
-				subtitle: r.fecha_posible_parto ? `Posible parto: ${r.fecha_posible_parto}` : '',
+				title: r.fecha_parto_real
+					? 'Parto registrado'
+					: r.prenez_confirmada === 'Sí'
+						? 'Preñez confirmada'
+						: 'Monta registrada',
+				subtitle: r.fecha_parto_real
+					? `Nacimiento: ${r.fecha_parto_real}`
+					: r.fecha_posible_parto
+						? `Posible parto: ${r.fecha_posible_parto}`
+						: '',
 				animalId: r.vaca_id,
 				animalName: animalMap.get(r.vaca_id) ?? r.vaca_id
 			})),
