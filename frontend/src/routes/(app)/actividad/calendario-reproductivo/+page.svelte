@@ -267,6 +267,8 @@
 	let vacantCowsOpen = $state(true);
 	let heatWindowOpen = $state(true);
 	let cowStatuses = $state<CowStatus[]>([]);
+	let animalLookup = $state(new Map<string, Animal>());
+	let photoLookup = $state(new Map<string, string>());
 
 	const today = new Date();
 
@@ -413,12 +415,26 @@
 	});
 
 	async function loadData() {
-		const [animals, reproRecords] = await Promise.all([
+		const [animals, reproRecords, photos] = await Promise.all([
 			db.animals.toArray(),
-			db.reproduction.where('deleted').equals(0).toArray()
+			db.reproduction.where('deleted').equals(0).toArray(),
+			db.photos.toArray()
 		]);
 
 		const activeAnimals = animals.filter((animal) => animal.deleted === 0);
+		animalLookup = new Map(activeAnimals.map((animal) => [animal.animal_id, animal]));
+		const nextPhotoLookup = new Map<string, string>();
+		for (const animal of activeAnimals) {
+			if (animal.foto_url) {
+				nextPhotoLookup.set(animal.animal_id, animal.foto_url);
+			}
+		}
+		for (const photo of photos) {
+			if (photo.deleted === 0) {
+				nextPhotoLookup.set(photo.animal_id, photo.data_url || photo.drive_url);
+			}
+		}
+		photoLookup = nextPhotoLookup;
 		const latestCalfBirthByMother = new Map<string, string>();
 		for (const animal of activeAnimals) {
 			const motherId = animal.madre_id?.trim();
@@ -470,6 +486,16 @@
 
 	function toggleCow(cowId: string) {
 		selectedCowId = selectedCowId === cowId ? null : cowId;
+	}
+
+	function calfLabel(calfId: string): string {
+		const calf = animalLookup.get(calfId);
+		if (!calf) return calfId;
+		return `${calf.nombre || 'Sin nombre'} ${formatTagId(calf.arete_id)}`.trim();
+	}
+
+	function calfPhotoSrc(calfId: string): string {
+		return photoLookup.get(calfId) || animalLookup.get(calfId)?.foto_url || '';
 	}
 
 	let kpiCards = $derived([
@@ -971,9 +997,29 @@
 																	{r.prenez_confirmada}
 																</span>
 															</td>
-															<td class="px-3 py-2 text-gray-500">
-																{r.cria_id || '—'}
-															</td>
+														<td class="px-3 py-2 text-gray-500">
+															{#if r.cria_id}
+																<div class="flex flex-col gap-1.5">
+																	{#if calfPhotoSrc(r.cria_id)}
+																		<a href="/ganado/{r.cria_id}" class="block w-fit">
+																			<img
+																				src={calfPhotoSrc(r.cria_id)}
+																				alt={calfLabel(r.cria_id)}
+																				class="h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
+																			/>
+																		</a>
+																	{/if}
+																	<a
+																		href="/ganado/{r.cria_id}"
+																		class="font-medium text-pink-700 underline decoration-pink-200 underline-offset-2 transition-colors hover:text-pink-800"
+																	>
+																		{calfLabel(r.cria_id)}
+																	</a>
+																</div>
+															{:else}
+																—
+															{/if}
+														</td>
 														</tr>
 													{/each}
 												</tbody>
