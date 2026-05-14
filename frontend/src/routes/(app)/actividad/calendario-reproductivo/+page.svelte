@@ -27,7 +27,11 @@
 	// ── Constants ──
 	const GESTATION_DAYS = 283;
 	const RECENT_BIRTH_DAYS = 60;
-	const OPEN_ALERT_DAYS = 90;
+	const OPEN_ALERT_DAYS = 170;
+	const WEANING_WINDOW_START_DAYS = 115;
+	const WEANING_WINDOW_END_DAYS = 160;
+	const HEAT_WINDOW_START_DAYS = 130;
+	const HEAT_WINDOW_END_DAYS = 170;
 	const CULL_EFFICIENCY = 0.6;
 
 	// ── Types ──
@@ -39,16 +43,25 @@
 		semaforoLabel: string;
 		lastMontaDate: string | null;
 		lastPartoDate: string | null;
+		lastCalfBirthDate: string | null;
+		lastBirthReferenceDate: string | null;
+		daysSinceLastBirth: number | null;
 		nextExpectedParto: string | null;
 		daysOpen: number | null;
 		records: ReproductionRecord[];
 	}
+
+	type CowStatusBase = Omit<
+		CowStatus,
+		'cow' | 'records' | 'lastCalfBirthDate' | 'lastBirthReferenceDate' | 'daysSinceLastBirth'
+	>;
 
 	interface HerdKPIs {
 		totalCows: number;
 		gestatingConfirmed: number;
 		gestatingProbable: number;
 		vacant: number;
+		nearWeaning: number;
 		recentBirth: number;
 		noHistory: number;
 		avgIEP: number | null;
@@ -72,10 +85,30 @@
 		return differenceInDays(new Date(), d) / 365.25;
 	}
 
+	function latestDateString(...dateStrings: Array<string | null | undefined>): string | null {
+		const validDates = dateStrings.filter((dateStr): dateStr is string => !!safeDate(dateStr));
+		if (validDates.length === 0) return null;
+		return validDates.sort((a, b) => b.localeCompare(a))[0] ?? null;
+	}
+
+	function daysSince(dateStr: string | null | undefined, today: Date): number | null {
+		const d = safeDate(dateStr);
+		if (!d) return null;
+		return differenceInDays(today, d);
+	}
+
+	function isWithinDaysRange(days: number | null, minDays: number, maxDays: number): boolean {
+		return days !== null && days >= minDays && days <= maxDays;
+	}
+
+	function hasCurrentGestation(status: CowStatus): boolean {
+		return status.semaforo === 'azul' || status.semaforo === 'amarillo';
+	}
+
 	function inferSemaforo(
 		records: ReproductionRecord[],
 		today: Date
-	): Omit<CowStatus, 'cow' | 'records'> {
+	): CowStatusBase {
 		if (records.length === 0) {
 			return {
 				semaforo: 'gris',
@@ -229,21 +262,52 @@
 	// ── State ──
 	let horizonMonths = $state(3);
 	let selectedCowId = $state<string | null>(null);
+	let herdSummaryInfoOpen = $state(false);
 	let alertsOpen = $state(true);
+	let vacantCowsOpen = $state(true);
+	let heatWindowOpen = $state(true);
 	let cowStatuses = $state<CowStatus[]>([]);
 
 	const today = new Date();
 
 	let windowStart = $derived(subMonths(today, horizonMonths));
 	let windowEnd = $derived(addMonths(today, horizonMonths));
+	let nearWeaningCows = $derived(
+		cowStatuses.filter((status) =>
+			isWithinDaysRange(status.daysSinceLastBirth, WEANING_WINDOW_START_DAYS, WEANING_WINDOW_END_DAYS)
+		)
+	);
+	let vacantCows = $derived(
+		cowStatuses
+			.filter(
+				(status) => !hasCurrentGestation(status) && (status.daysSinceLastBirth ?? -1) > OPEN_ALERT_DAYS
+			)
+			.sort(
+				(a, b) =>
+					(b.daysSinceLastBirth ?? -1) - (a.daysSinceLastBirth ?? -1)
+			)
+	);
+	let heatWindowCows = $derived(
+		cowStatuses
+			.filter(
+				(status) =>
+					!hasCurrentGestation(status) &&
+					isWithinDaysRange(status.daysSinceLastBirth, HEAT_WINDOW_START_DAYS, HEAT_WINDOW_END_DAYS)
+			)
+			.sort(
+				(a, b) =>
+					(a.lastBirthReferenceDate ?? '').localeCompare(b.lastBirthReferenceDate ?? '')
+			)
+	);
 
 	let herdKPIs = $derived.by((): HerdKPIs => {
 		const total = cowStatuses.length;
 		const confirmed = cowStatuses.filter((c) => c.semaforo === 'azul').length;
 		const probable = cowStatuses.filter((c) => c.semaforo === 'amarillo').length;
-		const vacant = cowStatuses.filter((c) => c.semaforo === 'rojo').length;
+		const vacant = vacantCows.length;
+		const nearWeaning = nearWeaningCows.length;
 		const recent = cowStatuses.filter((c) => c.semaforo === 'verde').length;
-		const noHist = cowStatuses.filter((c) => c.semaforo === 'gris').length;
+		const noHist = cowStatuses.filter((c) => c.records.length === 0).length;
 
 		const iepValues = cowStatuses
 			.map((c) => calcIEP(c.records))
@@ -265,6 +329,7 @@
 			gestatingConfirmed: confirmed,
 			gestatingProbable: probable,
 			vacant,
+			nearWeaning,
 			recentBirth: recent,
 			noHistory: noHist,
 			avgIEP,
@@ -353,13 +418,36 @@
 			db.reproduction.where('deleted').equals(0).toArray()
 		]);
 
-		const cows = animals.filter(
+		const activeAnimals = animals.filter((animal) => animal.deleted === 0);
+		const latestCalfBirthByMother = new Map<string, string>();
+		for (const animal of activeAnimals) {
+			const motherId = animal.madre_id?.trim();
+			if (!motherId || !animal.fecha_nacimiento) continue;
+			const currentLatest = latestCalfBirthByMother.get(motherId) ?? null;
+			const latestBirth = latestDateString(currentLatest, animal.fecha_nacimiento);
+			if (latestBirth) latestCalfBirthByMother.set(motherId, latestBirth);
+		}
+
+		const cows = activeAnimals.filter(
 			(a) => a.sexo === 'Hembra' && a.estado !== 'Vendido(a)' && a.estado !== 'Muerto(a)'
 		);
 
 		cowStatuses = cows.map((cow) => {
 			const records = reproRecords.filter((r) => r.vaca_id === cow.animal_id);
-			return { cow, records, ...inferSemaforo(records, today) };
+			const inferredStatus = inferSemaforo(records, today);
+			const lastCalfBirthDate = latestCalfBirthByMother.get(cow.animal_id) ?? null;
+			const lastBirthReferenceDate = latestDateString(
+				inferredStatus.lastPartoDate,
+				lastCalfBirthDate
+			);
+			return {
+				cow,
+				records,
+				...inferredStatus,
+				lastCalfBirthDate,
+				lastBirthReferenceDate,
+				daysSinceLastBirth: daysSince(lastBirthReferenceDate, today)
+			};
 		});
 	}
 
@@ -404,10 +492,22 @@
 			color: 'border-red-200 bg-red-50 text-red-700'
 		},
 		{
+			label: 'Próximas a destetar',
+			value: `${herdKPIs.nearWeaning}`,
+			sub: `${WEANING_WINDOW_START_DAYS}-${WEANING_WINDOW_END_DAYS}d posparto`,
+			color: 'border-amber-200 bg-amber-50 text-amber-700'
+		},
+		{
 			label: 'Recién paridas',
 			value: `${herdKPIs.recentBirth}`,
 			sub: `≤${RECENT_BIRTH_DAYS}d`,
 			color: 'border-green-200 bg-green-50 text-green-700'
+		},
+		{
+			label: 'Sin historial',
+			value: `${herdKPIs.noHistory}`,
+			sub: 'sin registros reproductivos',
+			color: 'border-slate-200 bg-slate-50 text-slate-700'
 		},
 		{
 			label: 'IEP promedio',
@@ -464,6 +564,72 @@
 
 	<!-- Herd KPIs -->
 	<section>
+		<div class="mb-2">
+			<button
+				onclick={() => (herdSummaryInfoOpen = !herdSummaryInfoOpen)}
+				class="inline-flex items-center gap-1 rounded-t-lg rounded-b-sm border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 transition-colors hover:bg-sky-100"
+			>
+				<HelpCircle size={12} />
+				Información
+				{#if herdSummaryInfoOpen}
+					<ChevronUp size={12} />
+				{:else}
+					<ChevronDown size={12} />
+				{/if}
+			</button>
+			{#if herdSummaryInfoOpen}
+				<div class="rounded-r-xl rounded-b-xl border border-sky-200 bg-sky-50/70 px-4 py-4 text-sm text-sky-950 shadow-sm">
+					<h4 class="text-xs font-bold uppercase tracking-[0.18em] text-sky-800">
+						Resumen destete idóneo tradicional (4-5 meses)
+					</h4>
+					<div class="mt-3 space-y-4">
+						<div>
+							<p class="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">
+								Condición fuerte
+							</p>
+							<ul class="mt-2 space-y-1.5 text-sm text-sky-950">
+								<li>- Extensivo, pasto verde: celo 130-150 días, alta preñez</li>
+								<li>- Extensivo, pasto seco: 150-170 días, media preñez</li>
+								<li>- Extensivo+suplemento, verde: 120-140 días, muy alta</li>
+								<li>- Extensivo+suplemento, seco: 130-150 días, alta</li>
+							</ul>
+						</div>
+						<div>
+							<p class="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">
+								Condición flaca
+							</p>
+							<ul class="mt-2 space-y-1.5 text-sm text-sky-950">
+								<li>- Extensivo, verde: 160-180 días, baja</li>
+								<li>- Extensivo, seco: 180-210 días, muy baja</li>
+								<li>- Extensivo+suplemento, verde: 140-160 días, media</li>
+								<li>- Extensivo+suplemento, seco: 150-170 días, media-baja</li>
+							</ul>
+						</div>
+						<div>
+							<p class="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">
+								Condición gorda
+							</p>
+							<ul class="mt-2 space-y-1.5 text-sm text-sky-950">
+								<li>- Extensivo, verde: 130-150 días, alta (vigilar distocia)</li>
+								<li>- Extensivo, seco: 150-170 días, media</li>
+								<li>- Extensivo+suplemento, verde: 120-140 días, muy alta</li>
+								<li>- Extensivo+suplemento, seco: 130-150 días, alta</li>
+							</ul>
+						</div>
+						<div class="space-y-2 rounded-lg bg-white/60 px-3 py-3 ring-1 ring-sky-100">
+							<p class="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">Nota</p>
+							<p class="text-sm text-sky-950">
+								Suplementación y pasturas verdes acortan anestro y mejoran tasa de preñez.
+							</p>
+							<p class="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">Meta</p>
+							<p class="text-sm text-sky-950">
+								Preñar entre 130-150 días posparto para intervalos aprox. de 12 meses.
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+		</div>
 		<h3 class="mb-2 text-sm font-bold uppercase tracking-wider text-gray-500">
 			Resumen del hato ({herdKPIs.totalCows} vacas)
 		</h3>
@@ -518,6 +684,93 @@
 			{/if}
 		</section>
 	{/if}
+
+	<!-- Vacant cows -->
+	<section class="rounded-xl border border-rose-200 bg-rose-50">
+		<button
+			onclick={() => (vacantCowsOpen = !vacantCowsOpen)}
+			class="flex w-full items-center justify-between px-4 py-3"
+		>
+			<span class="flex items-center gap-2 text-sm font-bold text-rose-800">
+				<Clock size={16} />
+				Vacas vacías ({vacantCows.length})
+			</span>
+			{#if vacantCowsOpen}
+				<ChevronUp size={16} class="text-rose-600" />
+			{:else}
+				<ChevronDown size={16} class="text-rose-600" />
+			{/if}
+		</button>
+		{#if vacantCowsOpen}
+			{#if vacantCows.length === 0}
+				<p class="px-4 pb-4 text-sm text-rose-700/80">
+					No hay vacas con más de {OPEN_ALERT_DAYS} días sin gestación probable o confirmada.
+				</p>
+			{:else}
+				<ul class="divide-y divide-rose-100 px-4 pb-3">
+					{#each vacantCows as { cow, daysSinceLastBirth, lastBirthReferenceDate } (cow.animal_id)}
+						<li class="flex cursor-pointer items-center justify-between py-2">
+							<button
+								onclick={() => toggleCow(cow.animal_id)}
+								class="flex items-center gap-2"
+							>
+								<span class="inline-block h-3 w-3 rounded-full bg-rose-400"></span>
+								<span class="font-medium text-gray-800">
+									{cow.nombre || formatTagId(cow.arete_id) || cow.animal_id}
+								</span>
+							</button>
+							<span class="text-right text-xs text-rose-800">
+								{daysSinceLastBirth}d desde {formatD(lastBirthReferenceDate)}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</section>
+
+	<!-- Ideal heat window -->
+	<section class="rounded-xl border border-amber-200 bg-amber-50">
+		<button
+			onclick={() => (heatWindowOpen = !heatWindowOpen)}
+			class="flex w-full items-center justify-between px-4 py-3"
+		>
+			<span class="flex items-center gap-2 text-sm font-bold text-amber-800">
+				Vacas en ventana de celo ideal supuesta ({heatWindowCows.length})
+			</span>
+			{#if heatWindowOpen}
+				<ChevronUp size={16} class="text-amber-600" />
+			{:else}
+				<ChevronDown size={16} class="text-amber-600" />
+			{/if}
+		</button>
+		{#if heatWindowOpen}
+			{#if heatWindowCows.length === 0}
+				<p class="px-4 pb-4 text-sm text-amber-700/80">
+					No hay vacas entre {HEAT_WINDOW_START_DAYS} y {HEAT_WINDOW_END_DAYS} días desde su última cría o parto.
+				</p>
+			{:else}
+				<ul class="divide-y divide-amber-100 px-4 pb-3">
+					{#each heatWindowCows as { cow, daysSinceLastBirth, lastBirthReferenceDate } (cow.animal_id)}
+						<li class="flex cursor-pointer items-center justify-between py-2">
+							<button
+								onclick={() => toggleCow(cow.animal_id)}
+								class="flex items-center gap-2"
+							>
+								<span class="inline-block h-3 w-3 rounded-full bg-amber-400"></span>
+								<span class="font-medium text-gray-800">
+									{cow.nombre || formatTagId(cow.arete_id) || cow.animal_id}
+								</span>
+							</button>
+							<span class="text-right text-xs text-amber-800">
+								{daysSinceLastBirth}d desde {formatD(lastBirthReferenceDate)}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</section>
 
 	<!-- Birth Radar -->
 	<section>
