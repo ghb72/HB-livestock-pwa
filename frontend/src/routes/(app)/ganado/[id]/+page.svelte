@@ -17,6 +17,7 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { db } from '$lib/db';
 	import { formatStoredDate } from '$lib/date';
+	import { formatTagId } from '$lib/helpers';
 	import {
 		getAnimal,
 		getHealthRecords,
@@ -209,9 +210,7 @@
 					<h2 class="text-xl font-bold text-gray-800">
 						{animal.nombre || 'Sin nombre'}
 					</h2>
-					<p class="text-sm text-gray-500">
-						#{animal.arete_id || '—'} · {animal.tipo}
-					</p>
+					<p class="text-sm text-gray-500">{animal.tipo}</p>
 				</div>
 			</div>
 			<div class="flex gap-2">
@@ -279,9 +278,10 @@
 				<div class="space-y-1">
 					<StatusBadge estado={animal.estado} />
 					<div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+						<span>ID: <strong>{formatTagId(animal.arete_id) || '—'}</strong></span>
 						<span>Sexo: <strong>{animal.sexo}</strong></span>
 						<span>Raza: <strong>{animal.raza || '—'}</strong></span>
-						<span>Temp: <strong>{animal.temperamento}</strong></span>
+						<span>Temperamento: <strong>{animal.temperamento}</strong></span>
 						{#if animal.peso_actual}
 							<span>Peso: <strong>{animal.peso_actual} kg</strong></span>
 						{/if}

@@ -7,6 +7,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
+	import { formatTagId } from '$lib/helpers';
 	import { computeMissingAnimals, type MissingAnimalInfo } from '$lib/missingAnimals';
 	import type { Animal, AnimalTipo } from '$lib/types';
 
@@ -180,7 +181,7 @@
 								{/if}
 							</div>
 							<div class="flex gap-3 text-xs text-gray-500">
-								<span>#{animal.arete_id || '—'}</span>
+								<span>{formatTagId(animal.arete_id) || '—'}</span>
 								<span>{animal.tipo}</span>
 								<span>{animal.sexo}</span>
 								{#if animal.raza}

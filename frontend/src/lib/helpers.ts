@@ -21,3 +21,14 @@ export function now(): string {
 export function currentUserId(): string {
 	return localStorage.getItem('livestock_user_id') ?? 'USR-001';
 }
+
+/** Format a 10-character tag ID as XX XXXX XXXX; otherwise return it without spaces. */
+export function formatTagId(value: string | number | null | undefined): string {
+	const rawValue = String(value ?? '').trim();
+	if (!rawValue) return '';
+
+	const compactValue = rawValue.replace(/\s+/g, '');
+	if (compactValue.length !== 10) return compactValue;
+
+	return `${compactValue.slice(0, 2)} ${compactValue.slice(2, 6)} ${compactValue.slice(6)}`;
+}
