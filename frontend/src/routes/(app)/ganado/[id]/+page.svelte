@@ -16,7 +16,7 @@
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { db } from '$lib/db';
-	import { formatStoredDate } from '$lib/date';
+	import { formatAgeFromDate, formatStoredDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import {
 		getAnimal,
@@ -185,6 +185,10 @@
 		}
 	}
 
+	function fmtAge(dateStr: string): string {
+		return formatAgeFromDate(dateStr);
+	}
+
 	async function handleDelete() {
 		if (!animal || !confirm('¿Estás seguro de eliminar este animal?')) return;
 		await deleteAnimal(animal.animal_id);
@@ -298,7 +302,12 @@
 			<div class="grid grid-cols-2 gap-3 text-sm">
 				<div>
 					<span class="text-xs text-gray-400">Nacimiento</span>
-					<p class="font-medium text-gray-700">{fmtDate(animal.fecha_nacimiento)}</p>
+					<p class="font-medium text-gray-700">
+						{fmtDate(animal.fecha_nacimiento)}
+						{#if fmtAge(animal.fecha_nacimiento)}
+							<span class="ml-1 italic text-gray-500">({fmtAge(animal.fecha_nacimiento)})</span>
+						{/if}
+					</p>
 				</div>
 				<div>
 					<span class="text-xs text-gray-400">Madre</span>
