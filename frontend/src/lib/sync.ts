@@ -8,6 +8,11 @@
  *   L2: Compare content not just timestamps — handle external Sheets edits
  *   L4: Protect unsynced local data — only overwrite synced=1 records
  *   L5: Free-tier constraints — visibility-aware polling, short-lived HTTP
+ *
+ * Polls every 60s while the tab is visible, pauses when hidden, and resumes on
+ * focus or when connectivity returns. An idle tick costs a single
+ * GET /api/sync/state; a full pull only runs when the server version changes.
+ * Repeated failures back off exponentially up to MAX_BACKOFF_MS.
  */
 
 import { db } from './db';
@@ -23,11 +28,17 @@ import { now } from './helpers';
 import type { ApiSyncState } from './api';
 import type { AnimalPhoto } from './types';
 
-const POLL_INTERVAL = 5 * 60_000;
+const POLL_INTERVAL = 60_000;
+
+// Cap the retry delay so a long outage settles at one attempt every ~16 min
+// instead of hammering the API 60 times an hour at the base interval.
+const MAX_BACKOFF_MS = 16 * 60_000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let isSyncing = false;
 let lastKnownSyncState: ApiSyncState | null = null;
+let failureStreak = 0;
+let nextAllowedSyncAt = 0;
 
 const REMOTE_PHOTO_CACHE_LIMIT = 150;
 
@@ -59,12 +70,29 @@ const TABLES: TableConfig[] = [
 
 // ── Pending detection ────────────────────────────────────
 
-async function hasPendingLocalChanges(): Promise<boolean> {
+/** Total unsynced records across every synced table plus photos. */
+export async function countPendingChanges(): Promise<number> {
 	const counts = await Promise.all([
 		...TABLES.map((t) => t.table().where('synced').equals(0).count()),
 		db.photos.where('synced').equals(0).count()
 	]);
-	return counts.some((c) => c > 0);
+	return counts.reduce((total, count) => total + count, 0);
+}
+
+async function hasPendingLocalChanges(): Promise<boolean> {
+	return (await countPendingChanges()) > 0;
+}
+
+// ── Failure backoff ──────────────────────────────────────
+
+function resetBackoff(): void {
+	failureStreak = 0;
+	nextAllowedSyncAt = 0;
+}
+
+function registerFailure(): void {
+	failureStreak += 1;
+	nextAllowedSyncAt = Date.now() + Math.min(POLL_INTERVAL * 2 ** failureStreak, MAX_BACKOFF_MS);
 }
 
 function isSyncStateEqual(left: ApiSyncState | null, right: ApiSyncState): boolean {
@@ -250,6 +278,8 @@ function preloadImage(url: string): Promise<void> {
 	});
 }
 
+const warmedPhotoUrls = new Set<string>();
+
 async function warmRemotePhotoCache(): Promise<void> {
 	if (typeof Image === 'undefined' || typeof navigator === 'undefined' || !navigator.onLine) return;
 
@@ -276,7 +306,11 @@ async function warmRemotePhotoCache(): Promise<void> {
 
 	let warmed = 0;
 	for (const url of remoteUrls) {
+		// At a 60s cadence re-preloading the same URLs every cycle is pure noise;
+		// the first pass already put them in the service worker image cache.
+		if (warmedPhotoUrls.has(url)) continue;
 		await preloadImage(url);
+		warmedPhotoUrls.add(url);
 		warmed += 1;
 		if (warmed >= REMOTE_PHOTO_CACHE_LIMIT) break;
 	}
@@ -290,6 +324,9 @@ export async function syncAll(forceRemotePull = false): Promise<void> {
 		dispatchSyncStatus('offline');
 		return;
 	}
+	// A user-forced sync always bypasses the backoff — it is the manual escape
+	// hatch when the automatic cycle is stuck behind a long retry delay.
+	if (!forceRemotePull && Date.now() < nextAllowedSyncAt) return;
 
 	isSyncing = true;
 	dispatchSyncStatus('syncing');
@@ -303,6 +340,7 @@ export async function syncAll(forceRemotePull = false): Promise<void> {
 			try {
 				nextSyncState = await apiGetSyncState();
 				if (isSyncStateEqual(lastKnownSyncState, nextSyncState)) {
+					resetBackoff();
 					dispatchSyncStatus('synced');
 					return;
 				}
@@ -330,12 +368,14 @@ export async function syncAll(forceRemotePull = false): Promise<void> {
 
 		nextSyncState = await apiGetSyncState().catch(() => null);
 		lastKnownSyncState = nextSyncState;
+		resetBackoff();
 		dispatchSyncStatus('synced');
 
 		if (typeof window !== 'undefined') {
 			window.dispatchEvent(new CustomEvent('sync-complete'));
 		}
 	} catch {
+		registerFailure();
 		dispatchSyncStatus('offline');
 	} finally {
 		isSyncing = false;
@@ -351,7 +391,7 @@ export function getIsSyncing(): boolean {
 function startPolling(): void {
 	if (pollTimer) return;
 	syncAll();
-	pollTimer = setInterval(syncAll, POLL_INTERVAL);
+	pollTimer = setInterval(() => syncAll(), POLL_INTERVAL);
 }
 
 function stopPolling(): void {
@@ -370,9 +410,26 @@ function handleVisibilityChange(): void {
 }
 
 function handleUserInteraction(): void {
-	if (!pollTimer && !document.hidden) {
+	if (document.hidden) return;
+	if (!pollTimer) {
+		// startPolling() already fires an immediate sync.
 		startPolling();
+		return;
 	}
+	// Timer already running: refocusing should still sync now rather than
+	// leaving the user waiting for the next tick.
+	syncAll();
+}
+
+function handleOnline(): void {
+	// Connectivity is back, so whatever caused the previous failures is likely
+	// resolved — retry immediately instead of sitting out the backoff delay.
+	resetBackoff();
+	syncAll();
+}
+
+function handleOffline(): void {
+	dispatchSyncStatus('offline');
 }
 
 export function initSync(): () => void {
@@ -380,6 +437,8 @@ export function initSync(): () => void {
 
 	document.addEventListener('visibilitychange', handleVisibilityChange);
 	window.addEventListener('focus', handleUserInteraction);
+	window.addEventListener('online', handleOnline);
+	window.addEventListener('offline', handleOffline);
 
 	if (!document.hidden) {
 		startPolling();
@@ -389,5 +448,7 @@ export function initSync(): () => void {
 		stopPolling();
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
 		window.removeEventListener('focus', handleUserInteraction);
+		window.removeEventListener('online', handleOnline);
+		window.removeEventListener('offline', handleOffline);
 	};
 }

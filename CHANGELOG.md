@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Reduced the automatic sync poll interval from 5 minutes to 60 seconds while the tab is visible, and made the engine sync immediately on window focus and when connectivity returns.
+- Replaced the manual sync button with a passive status chip that reports connection, in-progress sync, and the live pending-record count; it remains tappable to force an immediate sync as an escape hatch.
+- Corrected the "Pendientes de sincronizar" counter in settings, which previously ignored the `recorridos` and `photos` tables, by sharing the sync engine's `countPendingChanges()` helper.
+
+### Added
+
+- Added exponential backoff for consecutive sync failures, capped at one attempt every 16 minutes, so a persistent error no longer retries 60 times per hour at the new poll cadence. A user-forced sync bypasses the backoff.
+
+### Fixed
+
+- Stopped re-preloading already-cached remote photo URLs on every sync cycle, which became wasteful at the 60-second cadence.
+
 ## [2.1.0] - 2026-05-13
 
 ### Added

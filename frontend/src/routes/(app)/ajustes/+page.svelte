@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, Database, Wifi, WifiOff, Trash2 } from 'lucide-svelte';
 	import { db } from '$lib/db';
+	import { countPendingChanges } from '$lib/sync';
 	import Card from '$lib/components/Card.svelte';
 
 	let online = $state(navigator.onLine);
@@ -25,27 +26,25 @@
 
 	$effect(() => {
 		loadCounts();
+		const handler = () => loadCounts();
+		window.addEventListener('sync-complete', handler);
+		return () => window.removeEventListener('sync-complete', handler);
 	});
 
 	async function loadCounts() {
-		const [a, h, r, o, s] = await Promise.all([
+		const [a, h, r, o, s, pending] = await Promise.all([
 			db.animals.count(),
 			db.health.count(),
 			db.reproduction.count(),
 			db.observations.count(),
-			db.sales.count()
+			db.sales.count(),
+			countPendingChanges()
 		]);
 		animalCount = a;
 		healthCount = h;
 		reproCount = r;
 		obsCount = o;
 		salesCount = s;
-
-		let pending = 0;
-		const tables = [db.animals, db.health, db.reproduction, db.observations, db.sales];
-		for (const table of tables) {
-			pending += await table.where('synced').equals(0).count();
-		}
 		pendingCount = pending;
 	}
 
@@ -86,7 +85,9 @@
 				{online ? 'Conectado' : 'Sin conexión'}
 			</p>
 			<p class="text-sm text-gray-500">
-				{online ? 'Puedes sincronizar tus datos' : 'Los datos se guardan localmente'}
+				{online
+					? 'Tus datos se sincronizan solos cada minuto'
+					: 'Los datos se guardan localmente'}
 			</p>
 		</div>
 	</Card>

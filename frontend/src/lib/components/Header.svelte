@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Settings } from 'lucide-svelte';
-	import SyncButton from './SyncButton.svelte';
+	import SyncStatus from './SyncStatus.svelte';
 
 	interface Props {
 		title?: string;
@@ -14,7 +14,7 @@
 >
 	<h1 class="text-lg font-bold tracking-tight">{title}</h1>
 	<div class="flex items-center gap-2">
-		<SyncButton />
+		<SyncStatus />
 		<a
 			href="/ajustes"
 			class="rounded-full p-2 transition-colors hover:bg-green-600"
