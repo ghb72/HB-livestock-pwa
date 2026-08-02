@@ -9,13 +9,16 @@ Usage:
 """
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth import verify_token
 from .routers import auth, photos, sync
+from .services import sheets, supabase
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -74,6 +77,32 @@ async def root():
 async def health():
     """Detailed health check."""
     return {"status": "healthy", "version": "2.1.0"}
+
+
+@app.get("/health/db")
+async def health_db(_: str = Depends(verify_token)):
+    """
+    Deep health check that actually reaches Supabase.
+
+    Every other endpoint answers from memory — including /api/sync/state,
+    whose version counter is a module global — so none of them registers
+    activity on the Supabase project. The free tier pauses a project after
+    about a week without API traffic, so an external cron calls this endpoint
+    daily to keep it awake; see the keep-alive cron section in README.md.
+    """
+    try:
+        supabase.ping(sheets.SHEET_NAMES["animals"], sheets.PK_KEYS["animals"])
+    except Exception as exc:  # noqa: BLE001 — any failure means "not reachable"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Supabase unreachable: {exc}",
+        ) from exc
+
+    return {
+        "status": "healthy",
+        "database": "reachable",
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

@@ -12,6 +12,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Added `GET /health/db`, an authenticated deep health check that issues a real Supabase query, so an external daily cron can keep the free-tier project from being paused for inactivity. Every other endpoint answers from memory and therefore never registers database activity.
 - Added exponential backoff for consecutive sync failures, capped at one attempt every 16 minutes, so a persistent error no longer retries 60 times per hour at the new poll cadence. A user-forced sync bypasses the backoff.
 
 ### Fixed

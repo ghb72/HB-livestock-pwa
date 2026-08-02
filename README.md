@@ -154,6 +154,34 @@ You can start from frontend/.env.development.example and frontend/.env.productio
 5. In Vercel project environment variables, set VITE_API_URL=https://<your-render-service>.onrender.com.
 6. Redeploy both services after env vars are configured.
 
+### Keep-alive cron (required on free tiers)
+
+Supabase pauses a free-tier project after about a week without API traffic, and
+the app is used seasonally, so long gaps between real usage are normal. Nothing
+inside the PWA prevents this: `/health`, `/`, and `/api/sync/state` all answer
+from memory, so even a device left polling for days never touches the database.
+
+`GET /health/db` exists for this. It runs a real single-row PostgREST query and
+returns 503 if Supabase is unreachable. Point an external scheduler at it —
+cron-job.org is free and emails you when a run fails:
+
+1. Create a job with URL `https://<your-render-service>.onrender.com/health/db`,
+   method GET.
+2. Add the header `Authorization: Bearer <AUTH_TOKEN>` — the same token the
+   frontend uses. The endpoint is authenticated so it cannot be used by third
+   parties to generate Supabase traffic.
+3. Schedule it **daily**. The pause threshold is ~7 days, so a daily run leaves
+   a wide margin and costs nothing.
+4. Enable failure notifications. A silent cron is worthless here — the whole
+   point is finding out before the project pauses.
+
+One caveat from combining free tiers: Render spins the service down after 15
+minutes idle and a cold start takes roughly 50 seconds, which exceeds
+cron-job.org's 30-second request timeout. The request still wakes Render, but
+the run is reported as failed. Schedule **two runs about ten minutes apart**
+(for example 03:00 and 03:10): the first wakes the service, the second finds it
+warm and confirms Supabase is reachable.
+
 ## Current Feature Set
 
 - Animal registry with create, edit, detail view, zoomable photos, genealogy links, graphical family tree, offspring summaries, reproductive history, and soft-delete.

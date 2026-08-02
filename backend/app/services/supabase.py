@@ -102,6 +102,21 @@ def select_rows(table_name: str) -> list[dict]:
     return response.json()
 
 
+def ping(table_name: str, column: str) -> None:
+    """
+    Issue the cheapest possible authenticated read against a table.
+
+    Backs the deep health check. Selecting a single column of a single row
+    keeps the response body near-empty while still producing a real PostgREST
+    query, which is what the Supabase free tier counts as project activity.
+    """
+    _request(
+        "GET",
+        f"/rest/v1/{table_name}",
+        params={"select": column, "limit": "1"},
+    )
+
+
 def upsert_rows(table_name: str, rows: list[dict], conflict_key: str) -> list[dict]:
     """Upsert rows into a Supabase table using the provided conflict column."""
     if not rows:

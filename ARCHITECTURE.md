@@ -117,6 +117,7 @@ sync.
 
 - Validate the shared Bearer token.
 - Expose sync endpoints for each business table.
+- Expose a deep health check (`GET /health/db`) that reaches Supabase.
 - Merge local and remote records by updated_at.
 - Upload and delete animal photos in Supabase Storage.
 - Translate storage object paths into public URLs consumed by the frontend.
@@ -141,3 +142,12 @@ Typical backend variables:
 
 Render deploys the FastAPI service from backend/ using requirements-render.txt.
 The deployment must provide the same Supabase variables used locally.
+
+### Free-tier inactivity
+
+Supabase pauses free projects after roughly a week without API traffic, and this
+app runs seasonally. No client-side mechanism can cover the gap: the PWA may go
+weeks without being opened, and none of the frequently hit endpoints reads from
+the database. Liveness therefore depends on an external scheduler calling
+`GET /health/db` daily, which is the only endpoint that issues a real PostgREST
+query. Setup instructions live in README.md.
