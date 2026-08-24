@@ -87,6 +87,68 @@ The storage bucket is expected to be publicly readable because the backend retur
 
 The repository includes a ready-to-run Supabase bootstrap script at backend/data/supabase_schema.sql.
 
+### 2b) Local Supabase stack with Docker
+
+For testing changes on the preview branch without touching the real project,
+`docker-compose.yml` runs a local Supabase in four containers. Nothing is
+installed on the host beyond Docker itself.
+
+```bash
+docker compose up -d
+docker compose logs -f bootstrap   # waits for "Local Supabase stack is ready"
+```
+
+**Rootless Docker users:** published ports are silently dropped when RootlessKit
+runs with `--net=pasta --port-driver=implicit`, which is what `dockerd-rootless.sh`
+picks when `slirp4netns` is not installed. `docker ps` still reports
+`0.0.0.0:54321->8000/tcp`, but no listener exists and every request times out.
+Install `slirp4netns` and pin the working combination:
+
+```bash
+sudo dnf install -y slirp4netns   # or apt install slirp4netns
+mkdir -p ~/.config/systemd/user/docker.service.d
+printf '[Service]\nEnvironment=DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns\nEnvironment=DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=builtin\n' \
+  > ~/.config/systemd/user/docker.service.d/port-driver.conf
+systemctl --user daemon-reload && systemctl --user restart docker
+```
+
+Verify with `curl http://127.0.0.1:54321/healthz`, which must answer `ok`.
+
+The services are the minimum the backend actually calls:
+
+| Service | Image | Purpose |
+| --- | --- | --- |
+| `db` | `supabase/postgres` | Postgres plus the roles and `storage` schema PostgREST and storage-api expect |
+| `rest` | `postgrest/postgrest` | Serves the business tables at `/rest/v1/<table>` |
+| `storage` | `supabase/storage-api` | Backs the photo upload, public read and delete flow, storing objects in a volume |
+| `gateway` | `nginx` | Puts `/rest/v1` and `/storage/v1` on one origin, as a hosted project does |
+
+Auth, Realtime, Studio, imgproxy and the connection pooler are intentionally
+left out — the app uses none of them.
+
+A one-shot `bootstrap` container applies `backend/data/supabase_schema.sql`,
+the same file used on the real project, and then asserts that the seven tables
+and the public `livestock` bucket exist.
+
+Endpoints once it is up:
+
+- PostgREST and Storage: `http://127.0.0.1:54321`
+- Postgres, for a SQL client: `postgres://postgres:postgres@127.0.0.1:54322/postgres`
+
+`backend/.env.development.example` already points at this stack, so copying it
+to `backend/.env.development` is all the backend needs. The login token is
+`local-dev-token`.
+
+The credentials are Supabase's published demo values and are safe only because
+nothing here is reachable from outside the machine. Never reuse the service
+role key for the real project.
+
+To reset the database and the stored photos:
+
+```bash
+docker compose down -v && docker compose up -d
+```
+
 ### 3) Run backend
 
 ```bash

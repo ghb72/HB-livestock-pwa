@@ -12,6 +12,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Added a local Supabase test stack to `docker-compose.yml` so changes can be verified on the preview branch without touching the real project. It runs the minimum the backend actually calls — Postgres, PostgREST, storage-api and an nginx gateway that puts both APIs on one origin — because the backend speaks HTTP to `/rest/v1` and `/storage/v1`, never SQL, and a plain Postgres container cannot back it. A one-shot bootstrap container applies `backend/data/supabase_schema.sql` and verifies the tables and the public bucket.
 - Added `GET /health/db`, an authenticated deep health check that issues a real Supabase query, so an external daily cron can keep the free-tier project from being paused for inactivity. Every other endpoint answers from memory and therefore never registers database activity.
 - Added exponential backoff for consecutive sync failures, capped at one attempt every 16 minutes, so a persistent error no longer retries 60 times per hour at the new poll cadence. A user-forced sync bypasses the backoff.
 

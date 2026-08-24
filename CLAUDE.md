@@ -19,7 +19,19 @@ npm run dev          # Vite dev server; proxies /api and /health to localhost:80
 npm run check        # svelte-kit sync + svelte-check (the only type/lint gate)
 npm run build
 npm run preview
+
+# Local Supabase test stack — run from repo root
+docker compose up -d        # db + PostgREST + storage-api + nginx gateway on :54321
+docker compose logs -f bootstrap
 ```
+
+The backend never speaks SQL — it talks HTTP to PostgREST (`/rest/v1`) and the Storage API (`/storage/v1`) — so a bare Postgres container cannot back it locally. `docker-compose.yml` runs the minimum subset of a self-hosted Supabase that does, and `backend/.env.development.example` already points at it (`SUPABASE_URL=http://127.0.0.1:54321`, login token `local-dev-token`).
+
+Three details in that stack are load-bearing, each mapped to a failure that cost real time:
+
+- `docker/db-init/99999999000000_local-roles.sql` sets passwords on `authenticator` and `supabase_storage_admin`, which `supabase/postgres` creates passwordless. It is mounted as a **single file into the image's `migrations/` directory**, not into `init-scripts/`: `migrate.sh` runs init-scripts *before* the migrations that create those roles, so an init-scripts hook aborts the entrypoint and the container restart-loops. Mounting the directory would hide the 53 migrations the image ships.
+- The `storage` healthcheck must probe `127.0.0.1`, not `localhost` — the container resolves `localhost` to `[::1]` first and storage-api binds IPv4 only.
+- On **rootless Docker**, published ports are silently dropped unless `slirp4netns` is installed and RootlessKit is pinned to `--port-driver=builtin`; with the pasta/implicit default, `docker ps` reports the mapping but no listener exists. See README §2b.
 
 There is **no test suite and no linter config** in this repo. `npm run check` is the verification step for frontend changes; the backend has no automated checks.
 
