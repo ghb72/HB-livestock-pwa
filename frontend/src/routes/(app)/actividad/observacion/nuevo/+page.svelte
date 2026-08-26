@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { goBack } from '$lib/navigation.svelte';
 	import { page } from '$app/state';
-	import { ArrowLeft, Save } from 'lucide-svelte';
+	import { Save } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import FormField from '$lib/components/FormField.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
@@ -41,7 +43,7 @@
 				fecha: form.fecha,
 				notas: form.notas
 			});
-			history.back();
+			goBack('/actividad');
 		} finally {
 			saving = false;
 		}
@@ -50,13 +52,7 @@
 
 <div class="mx-auto max-w-lg">
 	<div class="mb-4 flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/actividad" />
 		<h2 class="text-xl font-bold text-gray-800">Observación</h2>
 	</div>
 

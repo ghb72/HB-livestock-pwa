@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goBack, replaceWith } from '$lib/navigation.svelte';
 	import { page } from '$app/state';
 	import { Save, Info } from 'lucide-svelte';
 	import { addDays, subDays, format } from 'date-fns';
@@ -205,7 +205,7 @@
 
 			if (reproductionId) {
 				await updateReproductionRecord(reproductionId, reproductionPayload);
-				goto(`/actividad/reproduccion/${reproductionId}`, { replaceState: true });
+				replaceWith(`/actividad/reproduccion/${reproductionId}`);
 				return;
 			}
 
@@ -238,7 +238,7 @@
 				await createReproductionRecord(reproductionPayload);
 			}
 
-			history.back();
+			goBack('/actividad');
 		} finally {
 			saving = false;
 		}

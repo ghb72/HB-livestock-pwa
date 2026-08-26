@@ -1,5 +1,13 @@
 <script lang="ts">
-	import { ArrowLeft, Calendar, ChevronRight, Edit, MapPin, Plus, Trash2 } from 'lucide-svelte';
+	import {
+		Calendar,
+		ChevronRight,
+		Edit,
+		MapPin,
+		Plus,
+		Trash2
+	} from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { goto } from '$app/navigation';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
@@ -69,14 +77,7 @@
 <div class="mx-auto max-w-lg space-y-4">
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-3">
-			<button
-				type="button"
-				onclick={() => history.back()}
-				class="rounded-lg p-1 text-gray-600 active:bg-gray-100"
-				aria-label="Volver"
-			>
-				<ArrowLeft size={22} />
-			</button>
+			<BackButton fallback="/actividad" size={22} class="rounded-lg p-1 text-gray-600 active:bg-gray-100" />
 			<div>
 				<h2 class="text-xl font-bold text-gray-800">Recorridos</h2>
 				<p class="text-xs text-gray-500">Historial de visitas al potrero</p>

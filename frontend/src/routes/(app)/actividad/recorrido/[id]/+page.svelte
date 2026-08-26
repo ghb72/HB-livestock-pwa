@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { ArrowLeft, Check, Eye, EyeOff, X } from 'lucide-svelte';
+	import { Check, Eye, EyeOff, X } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
@@ -92,12 +93,7 @@
 {:else}
 	<div class="mx-auto max-w-lg space-y-4">
 		<div class="flex items-center gap-3">
-			<button
-				onclick={() => history.back()}
-				class="rounded-lg p-1 text-gray-600 active:bg-gray-100"
-			>
-				<ArrowLeft size={22} />
-			</button>
+			<BackButton fallback="/actividad/recorridos" size={22} class="rounded-lg p-1 text-gray-600 active:bg-gray-100" />
 			<div>
 				<h2 class="text-lg font-bold text-gray-800">{formatRecorridoTitle(fecha)}</h2>
 				<p class="text-sm capitalize text-gray-500">{formatDate(fecha)}</p>

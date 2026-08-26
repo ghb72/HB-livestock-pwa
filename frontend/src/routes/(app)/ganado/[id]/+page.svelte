@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 	import {
-		ArrowLeft,
 		Edit,
 		Trash2,
 		GitBranch,
@@ -12,9 +10,11 @@
 		DollarSign,
 		AlertTriangle
 	} from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { db } from '$lib/db';
 	import { formatAgeFromDate, formatStoredDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
@@ -193,7 +193,7 @@
 	async function handleDelete() {
 		if (!animal || !confirm('¿Estás seguro de eliminar este animal?')) return;
 		await deleteAnimal(animal.animal_id);
-		goto('/ganado', { replaceState: true });
+		replaceWith('/ganado');
 	}
 </script>
 
@@ -204,13 +204,7 @@
 		<!-- Header -->
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-3">
-				<button
-					onclick={() => goto('/ganado')}
-					class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-					aria-label="Volver"
-				>
-					<ArrowLeft size={24} />
-				</button>
+				<BackButton fallback="/ganado" />
 				<div>
 					<h2 class="text-xl font-bold text-gray-800">
 						{animal.nombre || 'Sin nombre'}

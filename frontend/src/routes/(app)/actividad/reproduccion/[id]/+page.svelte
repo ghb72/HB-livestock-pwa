@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
-	import { ArrowLeft, Edit, Trash2 } from 'lucide-svelte';
+	import { Edit, Trash2 } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { deleteReproductionRecord } from '$lib/store';
 	import ReproductionForm from '$lib/components/ReproductionForm.svelte';
 
@@ -13,20 +14,14 @@
 		}
 
 		await deleteReproductionRecord(reproductionId);
-		goto('/actividad', { replaceState: true });
+		replaceWith('/actividad');
 	}
 </script>
 
 <div class="mx-auto max-w-lg">
 	<div class="mb-4 flex items-center justify-between gap-3">
 		<div class="flex items-center gap-3">
-			<button
-				onclick={() => goto('/actividad')}
-				class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-				aria-label="Volver"
-			>
-				<ArrowLeft size={24} />
-			</button>
+			<BackButton fallback="/actividad" />
 			<h2 class="text-xl font-bold text-gray-800">Detalle de reproducción</h2>
 		</div>
 		<div class="flex gap-2">

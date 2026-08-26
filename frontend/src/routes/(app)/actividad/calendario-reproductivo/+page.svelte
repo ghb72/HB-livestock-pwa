@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		ArrowLeft,
 		AlertTriangle,
 		CheckCircle,
 		Clock,
@@ -10,6 +9,7 @@
 		ChevronUp,
 		Baby
 	} from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import {
 		differenceInDays,
 		addMonths,
@@ -557,13 +557,7 @@
 <div class="mx-auto max-w-lg space-y-5 pb-8">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/actividad" />
 		<div>
 			<h2 class="text-xl font-bold text-gray-800">Inteligencia Reproductiva</h2>
 			<p class="text-xs text-gray-400">Solo lectura — datos calculados</p>

@@ -19,6 +19,10 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- The back arrow and the Android back gesture now return to the page you actually came from. Four "Volver" arrows navigated to a hard-coded parent route, which pushed a new history entry instead of popping one — opening an animal from a sale or from the genealogy graph and tapping Volver always dumped you at `/ganado`. All fourteen back arrows are now one shared component. It also falls back to a sensible parent when there is nothing to go back to, instead of leaving the standalone PWA with no way out of a page opened from the app icon or reached straight after login.
+- Filter changes in the genealogy graph no longer stack up in history, so one back press leaves the page rather than stepping back through every filter that was tried. The generation depth now lives in the URL alongside the focused animal.
+- Logging in no longer leaves `/login` in history, where pressing back landed on it and was immediately redirected forward again.
+- Returning to a list now restores it as it was left. The animal list keeps its search text, type filter and sort order — all three now live in the URL — and `/ganado`, `/actividad` and `/ventas` restore their scroll position, which previously failed because the list was still empty at the moment the browser tried to restore it.
 - Deleted photos are now actually removed. They had no way out of IndexedDB — photos have no remote table, so they never reached the table sync's soft-delete cleanup, and the frontend never called the backend's delete endpoint. Every deletion accumulated as a change that stayed pending forever and its file stayed in Supabase Storage. The sync engine now purges them, and photo deletion on the backend is idempotent so a file already removed from Storage cannot block the record.
 - Deleting an animal's photo now clears the animal's stored photo URL, so the removal reaches the other devices instead of leaving them showing an image whose file is gone.
 - Stopped showing photos that had been deleted locally: several views read the photo table without filtering soft-deleted rows.

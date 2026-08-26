@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
 	import {
 		HeartPulse,
 		Baby,
@@ -12,96 +13,25 @@
 	} from 'lucide-svelte';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
-	import { db } from '$lib/db';
-	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate } from '$lib/date';
-	import { formatTagId } from '$lib/helpers';
-	import { buildHealthBatches } from '$lib/health';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
-	import type { ReproductionRecord, Observation } from '$lib/types';
-	import type { HealthBatch } from '$lib/health';
+	import type { PageData } from './$types';
 
-	type ActivityItem = {
-		id: string;
-		date: string;
-		type: 'reproduccion' | 'observacion';
-		title: string;
-		subtitle: string;
-		animalId: string;
-		animalName: string;
-	};
+	let { data }: { data: PageData } = $props();
 
-	let animalMap = $state(new Map<string, string>());
-	let animalTagMap = $state(new Map<string, string>());
-	let photoMap = $state(new Map<string, string>());
-	let healthBatches = $state<HealthBatch[]>([]);
-	let activities = $state<ActivityItem[]>([]);
+	const animalMap = $derived(data.animalMap);
+	const animalTagMap = $derived(data.animalTagMap);
+	const photoMap = $derived(data.photoMap);
+	const healthBatches = $derived(data.healthBatches);
+	const activities = $derived(data.activities);
 
-	$effect(() => {
-		loadData();
+	onMount(() => {
+		const handler = () => invalidateAll();
+		window.addEventListener('sync-complete', handler);
+		return () => window.removeEventListener('sync-complete', handler);
 	});
-
-	async function loadData() {
-		const [healthRecords, reproRecords, observations, animals, photos] = await Promise.all([
-			db.health.where('deleted').equals(0).toArray(),
-			db.reproduction.where('deleted').equals(0).toArray(),
-			db.observations.where('deleted').equals(0).toArray(),
-			db.animals.toArray(),
-			getAllPhotos()
-		]);
-
-		animalMap = new Map(
-			animals.map((a) => [a.animal_id, a.nombre || formatTagId(a.arete_id) || a.animal_id])
-		);
-		animalTagMap = new Map(animals.map((a) => [a.animal_id, formatTagId(a.arete_id) || '—']));
-
-		const nextPhotoMap = new Map<string, string>();
-		for (const animal of animals) {
-			if (animal.foto_url) {
-				nextPhotoMap.set(animal.animal_id, animal.foto_url);
-			}
-		}
-		for (const photo of photos) {
-			if (photo.deleted === 0) {
-				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
-			}
-		}
-		photoMap = nextPhotoMap;
-
-		healthBatches = buildHealthBatches(healthRecords, animalMap, animalTagMap);
-
-		// Build activity items (repro + observations)
-		activities = [
-			...reproRecords.map((r) => ({
-				id: r.reproduccion_id,
-				date: r.fecha_parto_real || r.fecha_monta,
-				type: 'reproduccion' as const,
-				title: r.fecha_parto_real
-					? 'Parto registrado'
-					: r.prenez_confirmada === 'Sí'
-						? 'Preñez confirmada'
-						: 'Monta registrada',
-				subtitle: r.fecha_parto_real
-					? `Nacimiento: ${r.fecha_parto_real}`
-					: r.fecha_posible_parto
-						? `Posible parto: ${r.fecha_posible_parto}`
-						: '',
-				animalId: r.vaca_id,
-				animalName: animalMap.get(r.vaca_id) ?? r.vaca_id
-			})),
-			...observations.map((o) => ({
-				id: o.observacion_id,
-				date: o.fecha,
-				type: 'observacion' as const,
-				title: 'Observación',
-				subtitle: o.notas.slice(0, 80),
-				animalId: o.animal_id,
-				animalName: animalMap.get(o.animal_id) ?? o.animal_id
-			}))
-		].sort((a, b) => b.date.localeCompare(a.date));
-	}
 
 	function formatDate(dateStr: string): string {
 		if (!dateStr) return '';

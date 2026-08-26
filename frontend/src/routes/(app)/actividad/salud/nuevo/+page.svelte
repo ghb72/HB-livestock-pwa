@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { ArrowLeft, Save, Check, StickyNote, X, Loader2 } from 'lucide-svelte';
+	import { goBack } from '$lib/navigation.svelte';
+	import { Save, Check, StickyNote, X, Loader2 } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import FormField from '$lib/components/FormField.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
@@ -165,7 +167,7 @@
 			}
 
 			await db.health.bulkAdd(records);
-			history.back();
+			goBack('/actividad');
 		} finally {
 			saving = false;
 		}
@@ -174,13 +176,7 @@
 
 <div class="mx-auto max-w-lg space-y-4 pb-6">
 	<div class="flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/actividad" />
 		<h2 class="text-xl font-bold text-gray-800">Evento de salud masivo</h2>
 	</div>
 
