@@ -23,6 +23,11 @@
 	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
+	import {
+		applyMontaCorrections,
+		planMontaReconciliation,
+		type MontaCorrection
+	} from '$lib/montaConsistency';
 	import type { Animal, ReproductionRecord } from '$lib/types';
 
 	// ── Constants ──
@@ -107,9 +112,14 @@
 	}
 
 	function inferSemaforo(
-		records: ReproductionRecord[],
-		today: Date
+		allRecords: ReproductionRecord[],
+		today: Date,
+		archived: ReadonlyMap<string, string>
 	): CowStatusBase {
+		// A monta contradicted by a birth never happened as recorded, so it must not
+		// become the cow's last monta nor drive her expected birth.
+		const records = allRecords.filter((r) => !archived.has(r.reproduccion_id));
+
 		if (records.length === 0) {
 			return {
 				semaforo: 'gris',
@@ -270,6 +280,9 @@
 	let cowStatuses = $state<CowStatus[]>([]);
 	let animalLookup = $state(new Map<string, Animal>());
 	let photoLookup = $state(new Map<string, string>());
+	let archivedMontas = $state(new Map<string, string>());
+	let montaCorrections = $state<MontaCorrection[]>([]);
+	let correctionsNoticeOpen = $state(true);
 
 	const today = new Date();
 
@@ -416,13 +429,26 @@
 	});
 
 	async function loadData() {
-		const [animals, reproRecords, photos] = await Promise.all([
+		const [animals, storedRepro, photos] = await Promise.all([
 			db.animals.toArray(),
 			db.reproduction.where('deleted').equals(0).toArray(),
 			getAllPhotos()
 		]);
 
 		const activeAnimals = animals.filter((animal) => animal.deleted === 0);
+
+		// Reconcile before anything is computed: a mating observation contradicted by
+		// a real birth would otherwise drive the whole page's inference.
+		const plan = planMontaReconciliation(storedRepro, activeAnimals);
+		let reproRecords = storedRepro;
+		if (plan.corrections.length > 0) {
+			await applyMontaCorrections(plan.corrections);
+			reproRecords = await db.reproduction.where('deleted').equals(0).toArray();
+		}
+		montaCorrections = plan.corrections;
+		correctionsNoticeOpen = plan.corrections.length > 0;
+		archivedMontas = plan.archived;
+
 		animalLookup = new Map(activeAnimals.map((animal) => [animal.animal_id, animal]));
 		const nextPhotoLookup = new Map<string, string>();
 		for (const animal of activeAnimals) {
@@ -451,7 +477,7 @@
 
 		cowStatuses = cows.map((cow) => {
 			const records = reproRecords.filter((r) => r.vaca_id === cow.animal_id);
-			const inferredStatus = inferSemaforo(records, today);
+			const inferredStatus = inferSemaforo(records, today, plan.archived);
 			const lastCalfBirthDate = latestCalfBirthByMother.get(cow.animal_id) ?? null;
 			const lastBirthReferenceDate = latestDateString(
 				inferredStatus.lastPartoDate,
@@ -489,10 +515,10 @@
 		selectedCowId = selectedCowId === cowId ? null : cowId;
 	}
 
-	function calfLabel(calfId: string): string {
-		const calf = animalLookup.get(calfId);
-		if (!calf) return calfId;
-		return `${calf.nombre || 'Sin nombre'} ${formatTagId(calf.arete_id)}`.trim();
+	function animalLabel(animalId: string): string {
+		const animal = animalLookup.get(animalId);
+		if (!animal) return animalId;
+		return `${animal.nombre || 'Sin nombre'} ${formatTagId(animal.arete_id)}`.trim();
 	}
 
 	function calfPhotoSrc(calfId: string): string {
@@ -563,6 +589,47 @@
 			<p class="text-xs text-gray-400">Solo lectura — datos calculados</p>
 		</div>
 	</div>
+
+	<!-- Automatic monta date corrections -->
+	{#if correctionsNoticeOpen && montaCorrections.length > 0}
+		<section class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+			<div class="flex items-start justify-between gap-3">
+				<p class="text-sm font-bold text-sky-800">
+					{montaCorrections.length}
+					{montaCorrections.length === 1
+						? 'fecha de monta corregida automáticamente'
+						: 'fechas de monta corregidas automáticamente'}
+				</p>
+				<button
+					type="button"
+					onclick={() => (correctionsNoticeOpen = false)}
+					class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+				>
+					Cerrar
+				</button>
+			</div>
+			<p class="mt-1 text-xs text-sky-700/80">
+				La vaca ya había parido antes del parto inferido, así que la monta se recorrió a {GESTATION_DAYS}
+				días antes del parto real.
+			</p>
+			<ul class="mt-2 space-y-1">
+				{#each montaCorrections as correction (correction.reproduccion_id)}
+					<li class="text-sm text-sky-950">
+						<a
+							href="/actividad/reproduccion/{correction.reproduccion_id}"
+							class="font-medium underline decoration-sky-300 underline-offset-2"
+						>
+							{animalLabel(correction.vaca_id)}
+						</a>
+						: {formatD(correction.previousMontaDate)} → {formatD(correction.correctedMontaDate)}
+						<span class="text-xs text-sky-700/80">
+							(parto {formatD(correction.birthDate)})
+						</span>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 
 	<!-- Horizon selector -->
 	<div class="flex items-center gap-2">
@@ -971,9 +1038,20 @@
 												</thead>
 												<tbody>
 													{#each sortedHistory as r (r.reproduccion_id)}
+														{@const archivedBirth = archivedMontas.get(r.reproduccion_id)}
 														<tr class="border-b border-gray-50 last:border-b-0">
 															<td class="px-3 py-2 text-gray-700">
 																{formatD(r.fecha_monta)}
+																{#if archivedBirth}
+																	<span
+																		class="mt-1 block w-fit rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
+																	>
+																		Archivada
+																	</span>
+																	<span class="mt-0.5 block text-xs text-gray-400">
+																		parto el {formatD(archivedBirth)}
+																	</span>
+																{/if}
 															</td>
 															<td class="px-3 py-2 font-medium text-gray-800">
 																{r.fecha_parto_real
@@ -999,7 +1077,7 @@
 																		<a href="/ganado/{r.cria_id}" class="block w-fit">
 																			<img
 																				src={calfPhotoSrc(r.cria_id)}
-																				alt={calfLabel(r.cria_id)}
+																				alt={animalLabel(r.cria_id)}
 																				class="h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
 																			/>
 																		</a>
@@ -1008,7 +1086,7 @@
 																		href="/ganado/{r.cria_id}"
 																		class="font-medium text-pink-700 underline decoration-pink-200 underline-offset-2 transition-colors hover:text-pink-800"
 																	>
-																		{calfLabel(r.cria_id)}
+																		{animalLabel(r.cria_id)}
 																	</a>
 																</div>
 															{:else}
