@@ -27,6 +27,11 @@ class PhotoUploadResponse(BaseModel):
 
     photo_id: str
     animal_id: str
+    photo_url: str
+    # Deprecated alias of photo_url, carrying the same value. The PWA is served
+    # through a service worker, so a device can run cached frontend code that
+    # still reads drive_url against this backend. Drop it once every client has
+    # picked up the release that renamed the field.
     drive_url: str
 
 
@@ -55,11 +60,12 @@ async def upload_single_photo(
     configured storage bucket.
     """
     try:
-        drive_url = upload_photo(request.photo_id, request.data_url)
+        photo_url = upload_photo(request.photo_id, request.data_url)
         return PhotoUploadResponse(
             photo_id=request.photo_id,
             animal_id=request.animal_id,
-            drive_url=drive_url,
+            photo_url=photo_url,
+            drive_url=photo_url,
         )
     except Exception as e:
         raise HTTPException(
@@ -84,12 +90,13 @@ async def upload_batch_photos(
 
     for photo in request.photos:
         try:
-            drive_url = upload_photo(photo.photo_id, photo.data_url)
+            photo_url = upload_photo(photo.photo_id, photo.data_url)
             uploaded.append(
                 PhotoUploadResponse(
                     photo_id=photo.photo_id,
                     animal_id=photo.animal_id,
-                    drive_url=drive_url,
+                    photo_url=photo_url,
+                    drive_url=photo_url,
                 )
             )
         except Exception as e:
@@ -106,17 +113,30 @@ async def upload_batch_photos(
 @router.delete("/{photo_id}")
 async def remove_photo(
     photo_id: str,
-    drive_url: str,
+    photo_url: str | None = None,
+    drive_url: str | None = None,
     _: str = Depends(verify_token),
 ):
     """
     Delete a photo from Supabase Storage.
 
+    Idempotent: an object that is already gone still answers 200, so a client
+    reporting a deletion it queued while offline is never stuck retrying it.
+
     Args:
         photo_id: The photo identifier.
-        drive_url: The public storage URL to delete.
+        photo_url: The public storage URL to delete.
+        drive_url: Deprecated alias of photo_url, for clients still running the
+            cached frontend from before the rename.
     """
-    success = delete_photo(photo_id, drive_url)
+    target_url = photo_url or drive_url
+    if not target_url:
+        raise HTTPException(
+            status_code=422,
+            detail="Either photo_url or drive_url is required",
+        )
+
+    success = delete_photo(photo_id, target_url)
     if not success:
         raise HTTPException(
             status_code=500,
