@@ -59,13 +59,15 @@ The local photo table contains:
 - photo_id
 - animal_id
 - data_url for pending local payloads
-- drive_url as the persisted public URL field already used by the frontend
+- photo_url as the persisted public URL field already used by the frontend
 - synced
 - deleted
 - created_at
 
-The field name drive_url is legacy naming. It now stores the public URL returned
-by Supabase Storage.
+There is no remote photos table. A photo exists remotely only as an object in
+Supabase Storage, and the URL reaches the other devices through the animal's
+foto_url column. Deleting a photo therefore runs as its own purge against the
+Storage API rather than through the table sync.
 
 ### Remote Supabase tables
 

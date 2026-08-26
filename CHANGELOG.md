@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Renamed the photo record's `drive_url` field to `photo_url` across the frontend, the API contract, and the docs — the old name was Google Drive-era residue and the field has held a Supabase Storage URL since the migration. An IndexedDB migration (Dexie v4) renames the field on existing devices, and the upload response carries a deprecated `drive_url` alias for one release so a client still running cached frontend code keeps working.
 - Reduced the automatic sync poll interval from 5 minutes to 60 seconds while the tab is visible, and made the engine sync immediately on window focus and when connectivity returns.
 - Replaced the manual sync button with a passive status chip that reports connection, in-progress sync, and the live pending-record count; it remains tappable to force an immediate sync as an escape hatch.
 - Corrected the "Pendientes de sincronizar" counter in settings, which previously ignored the `recorridos` and `photos` tables, by sharing the sync engine's `countPendingChanges()` helper.
@@ -18,6 +19,9 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Deleted photos are now actually removed. They had no way out of IndexedDB — photos have no remote table, so they never reached the table sync's soft-delete cleanup, and the frontend never called the backend's delete endpoint. Every deletion accumulated as a change that stayed pending forever and its file stayed in Supabase Storage. The sync engine now purges them, and photo deletion on the backend is idempotent so a file already removed from Storage cannot block the record.
+- Deleting an animal's photo now clears the animal's stored photo URL, so the removal reaches the other devices instead of leaving them showing an image whose file is gone.
+- Stopped showing photos that had been deleted locally: several views read the photo table without filtering soft-deleted rows.
 - Stopped re-preloading already-cached remote photo URLs on every sync cycle, which became wasteful at the 60-second cadence.
 
 ## [2.1.0] - 2026-05-13
