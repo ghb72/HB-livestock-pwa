@@ -13,6 +13,7 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import { buildHealthBatches } from '$lib/health';
@@ -48,7 +49,7 @@
 			db.reproduction.where('deleted').equals(0).toArray(),
 			db.observations.where('deleted').equals(0).toArray(),
 			db.animals.toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 
 		animalMap = new Map(
@@ -64,7 +65,7 @@
 		}
 		for (const photo of photos) {
 			if (photo.deleted === 0) {
-				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 		photoMap = nextPhotoMap;

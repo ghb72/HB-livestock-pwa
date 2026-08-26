@@ -4,6 +4,7 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import { formatRecorridoTitle } from '$lib/recorridos';
@@ -47,7 +48,7 @@
 
 		const [allAlive, allPhotos] = await Promise.all([
 			db.animals.where('estado').equals('Vivo(a)').toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 		const seenIds = new Set(entries.map((e) => e.animal_id));
 		const animalsMap = new Map(allAlive.map((a) => [a.animal_id, a]));
@@ -61,7 +62,7 @@
 
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				photos.set(photo.animal_id, photo.data_url || photo.drive_url);
+				photos.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 

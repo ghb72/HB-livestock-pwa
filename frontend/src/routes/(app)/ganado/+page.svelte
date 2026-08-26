@@ -7,6 +7,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { formatTagId } from '$lib/helpers';
 	import { computeMissingAnimals, type MissingAnimalInfo } from '$lib/missingAnimals';
 	import type { Animal, AnimalTipo } from '$lib/types';
@@ -35,7 +36,7 @@
 	async function loadData() {
 		const [allAnimals, allPhotos, missing] = await Promise.all([
 			db.animals.where('deleted').equals(0).toArray(),
-			db.photos.toArray(),
+			getAllPhotos(),
 			computeMissingAnimals()
 		]);
 
@@ -46,7 +47,7 @@
 			}
 		}
 		for (const p of allPhotos) {
-			if (p.deleted === 0) pMap.set(p.animal_id, p.data_url || p.drive_url);
+			pMap.set(p.animal_id, p.data_url || p.photo_url);
 		}
 		photoMap = pMap;
 		missingInfo = missing;

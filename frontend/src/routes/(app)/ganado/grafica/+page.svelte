@@ -6,6 +6,7 @@
 	import '@xyflow/svelte/dist/style.css';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { createGenealogySource, buildFlowLayout } from '$lib/genealogy';
 	import { formatTagId } from '$lib/helpers';
 	import type { Animal, AnimalPhoto, EstadoAnimal, ReproductionRecord } from '$lib/types';
@@ -30,7 +31,7 @@
 		try {
 			const [allAnimals, allPhotos, allReproduction] = await Promise.all([
 				db.animals.where('deleted').equals(0).toArray(),
-				db.photos.toArray(),
+				getAllPhotos(),
 				db.reproduction.where('deleted').equals(0).toArray()
 			]);
 			animals = allAnimals;

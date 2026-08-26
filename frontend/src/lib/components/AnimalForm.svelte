@@ -118,7 +118,7 @@
 
 		const photos = await getPhotos(id);
 		if (photos.length > 0) {
-			photoData = photos[0].data_url || photos[0].drive_url;
+			photoData = photos[0].data_url || photos[0].photo_url;
 		} else if (existing.foto_url) {
 			photoData = existing.foto_url;
 		}

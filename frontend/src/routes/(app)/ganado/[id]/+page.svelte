@@ -23,6 +23,7 @@
 		getHealthRecords,
 		getObservations,
 		getPhotos,
+		getAllPhotos,
 		deleteAnimal
 	} from '$lib/store';
 	import { computeMissingAnimals } from '$lib/missingAnimals';
@@ -104,7 +105,7 @@
 		reproRecords = allRepro.sort((x, y) => y.fecha_monta.localeCompare(x.fecha_monta));
 
 		// Photo
-		photoSrc = photos.length > 0 ? photos[0].data_url || photos[0].drive_url : a.foto_url;
+		photoSrc = photos.length > 0 ? photos[0].data_url || photos[0].photo_url : a.foto_url;
 
 		// Parents
 		if (a.madre_id) {
@@ -132,13 +133,13 @@
 				.equals(id)
 				.filter((r) => r.deleted === 0)
 				.toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 		const byId = new Map<string, { animal_id: string; nombre: string; arete_id: string; photoSrc: string }>();
 		const photoMap = new Map<string, string>();
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				photoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+				photoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 		for (const calf of [...calvesByMother, ...calvesByFather]) {

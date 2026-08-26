@@ -20,6 +20,7 @@
 	} from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import type { Animal, ReproductionRecord } from '$lib/types';
@@ -418,7 +419,7 @@
 		const [animals, reproRecords, photos] = await Promise.all([
 			db.animals.toArray(),
 			db.reproduction.where('deleted').equals(0).toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 
 		const activeAnimals = animals.filter((animal) => animal.deleted === 0);
@@ -431,7 +432,7 @@
 		}
 		for (const photo of photos) {
 			if (photo.deleted === 0) {
-				nextPhotoLookup.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoLookup.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 		photoLookup = nextPhotoLookup;

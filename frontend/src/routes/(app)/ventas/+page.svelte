@@ -4,6 +4,7 @@
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
@@ -27,7 +28,7 @@
 		const [allSales, allAnimals, allPhotos] = await Promise.all([
 			db.sales.where('deleted').equals(0).toArray(),
 			db.animals.toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 		sales = allSales.sort((a, b) => b.fecha_venta.localeCompare(a.fecha_venta));
 		animalMap = new Map(
@@ -42,7 +43,7 @@
 		}
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				photos.set(photo.animal_id, photo.data_url || photo.drive_url);
+				photos.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 		photoMap = photos;

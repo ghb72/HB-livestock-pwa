@@ -13,6 +13,7 @@
 		Save
 	} from 'lucide-svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import DateField from '$lib/components/DateField.svelte';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId, formatTagId } from '$lib/helpers';
@@ -58,7 +59,7 @@
 	async function loadAnimals() {
 		const [allAnimals, allPhotos] = await Promise.all([
 			db.animals.where('estado').equals('Vivo(a)').sortBy('nombre'),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 
 		const nextPhotoMap = new Map<string, string>();
@@ -69,7 +70,7 @@
 		}
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 

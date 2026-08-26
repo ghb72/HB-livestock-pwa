@@ -3,6 +3,7 @@
 	import FormField from '$lib/components/FormField.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId, formatTagId } from '$lib/helpers';
 	import type { Animal, TipoEventoSalud, EstadoGeneral, HealthRecord } from '$lib/types';
@@ -58,7 +59,7 @@
 				.equals(0)
 				.filter((a) => a.estado === 'Vivo(a)')
 				.toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 
 		allAnimals.sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
@@ -71,7 +72,7 @@
 		}
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 
