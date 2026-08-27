@@ -53,6 +53,16 @@ export const POSTPARTUM_WAIT_DAYS = 45;
  */
 export const MIN_CALVING_INTERVAL_DAYS = GESTATION_DAYS + POSTPARTUM_WAIT_DAYS;
 
+/** Age at which a female starts counting as a breeding cow rather than a heifer. */
+export const BREEDING_AGE_YEARS = 2;
+
+/**
+ * How many of a cow's most recent intervals the headline IEP averages. A
+ * lifetime mean answers a different question — whether management has drifted
+ * over the years — and is reported separately.
+ */
+export const RECENT_INTERVALS = 2;
+
 export interface BirthEvent {
 	/** ISO date of the calving. */
 	date: string;
@@ -108,6 +118,27 @@ export function birthsByCow(
 
 	for (const events of byCow.values()) events.sort((a, b) => a.date.localeCompare(b.date));
 	return byCow;
+}
+
+/**
+ * Days between consecutive calvings, oldest interval first. Two calvings on the
+ * same day are twins, not an interval of zero. No plausibility filtering here —
+ * an implausibly short interval is a data problem, and hiding it would hide it
+ * from the people who can fix it.
+ */
+export function calvingIntervals(births: BirthEvent[]): number[] {
+	const dates = births.map((birth) => birth.date).sort();
+	const intervals: number[] = [];
+
+	for (let i = 1; i < dates.length; i++) {
+		const from = parseStoredDate(dates[i - 1]);
+		const to = parseStoredDate(dates[i]);
+		if (!from || !to) continue;
+		const days = differenceInDays(to, from);
+		if (days > 0) intervals.push(days);
+	}
+
+	return intervals;
 }
 
 // ── Reconciliation ───────────────────────────────────────
