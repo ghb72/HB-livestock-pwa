@@ -7,7 +7,8 @@
 		HelpCircle,
 		ChevronDown,
 		ChevronUp,
-		Baby
+		Baby,
+		Pencil
 	} from 'lucide-svelte';
 	import BackButton from '$lib/components/BackButton.svelte';
 	import {
@@ -24,14 +25,17 @@
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
 	import {
-		applyMontaCorrections,
+		applyMontaReconciliation,
+		birthsByCow,
 		planMontaReconciliation,
-		type MontaCorrection
-	} from '$lib/montaConsistency';
+		GESTATION_DAYS,
+		type BirthEvent,
+		type MontaCorrection,
+		type PrenezRevocation
+	} from '$lib/reproduction';
 	import type { Animal, ReproductionRecord } from '$lib/types';
 
 	// ── Constants ──
-	const GESTATION_DAYS = 283;
 	const RECENT_BIRTH_DAYS = 60;
 	const OPEN_ALERT_DAYS = 170;
 	const WEANING_WINDOW_START_DAYS = 115;
@@ -55,11 +59,17 @@
 		nextExpectedParto: string | null;
 		daysOpen: number | null;
 		records: ReproductionRecord[];
+		births: BirthEvent[];
 	}
 
 	type CowStatusBase = Omit<
 		CowStatus,
-		'cow' | 'records' | 'lastCalfBirthDate' | 'lastBirthReferenceDate' | 'daysSinceLastBirth'
+		| 'cow'
+		| 'records'
+		| 'births'
+		| 'lastCalfBirthDate'
+		| 'lastBirthReferenceDate'
+		| 'daysSinceLastBirth'
 	>;
 
 	interface HerdKPIs {
@@ -91,12 +101,6 @@
 		return differenceInDays(new Date(), d) / 365.25;
 	}
 
-	function latestDateString(...dateStrings: Array<string | null | undefined>): string | null {
-		const validDates = dateStrings.filter((dateStr): dateStr is string => !!safeDate(dateStr));
-		if (validDates.length === 0) return null;
-		return validDates.sort((a, b) => b.localeCompare(a))[0] ?? null;
-	}
-
 	function daysSince(dateStr: string | null | undefined, today: Date): number | null {
 		const d = safeDate(dateStr);
 		if (!d) return null;
@@ -114,13 +118,17 @@
 	function inferSemaforo(
 		allRecords: ReproductionRecord[],
 		today: Date,
-		archived: ReadonlyMap<string, string>
+		archived: ReadonlyMap<string, string>,
+		births: BirthEvent[]
 	): CowStatusBase {
 		// A monta contradicted by a birth never happened as recorded, so it must not
-		// become the cow's last monta nor drive her expected birth.
-		const records = allRecords.filter((r) => !archived.has(r.reproduccion_id));
+		// become the cow's last monta nor drive her expected birth. Neither may a
+		// mating whose pregnancy was explicitly ruled out.
+		const records = allRecords.filter(
+			(r) => !archived.has(r.reproduccion_id) && r.prenez_confirmada !== 'No'
+		);
 
-		if (records.length === 0) {
+		if (records.length === 0 && births.length === 0) {
 			return {
 				semaforo: 'gris',
 				semaforoLabel: 'Sin historial',
@@ -135,19 +143,19 @@
 			(b.fecha_monta || '').localeCompare(a.fecha_monta || '')
 		);
 
-		const partosDesc = [...records]
-			.filter((r) => !!r.fecha_parto_real)
-			.sort((a, b) => b.fecha_parto_real.localeCompare(a.fecha_parto_real));
+		// Calvings come from both tables — see birthsByCow. Reading only the
+		// reproduction records here is what let a birth registered as a calf leave a
+		// stale mating in charge of the cow's status.
+		const partosDesc = [...births].sort((a, b) => b.date.localeCompare(a.date));
 
-		const lastParto = partosDesc[0] ?? null;
-		const lastPartoDate = lastParto?.fecha_parto_real ?? null;
+		const lastPartoDate = partosDesc[0]?.date ?? null;
 		const lastPartoDateObj = safeDate(lastPartoDate);
 
 		const lastMontaRecord = sorted.find((r) => {
 			const montaDate = safeDate(r.fecha_monta);
 			if (!montaDate) return false;
 			return !partosDesc.some((p) => {
-				const pd = safeDate(p.fecha_parto_real);
+				const pd = safeDate(p.date);
 				return pd && pd > montaDate;
 			});
 		});
@@ -239,11 +247,8 @@
 		};
 	}
 
-	function calcIEP(records: ReproductionRecord[]): number | null {
-		const partos = records
-			.filter((r) => !!r.fecha_parto_real)
-			.map((r) => r.fecha_parto_real)
-			.sort();
+	function calcIEP(births: BirthEvent[]): number | null {
+		const partos = births.map((b) => b.date).sort();
 		if (partos.length < 2) return null;
 		const intervals: number[] = [];
 		for (let i = 1; i < partos.length; i++) {
@@ -255,11 +260,10 @@
 		return Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length);
 	}
 
-	function calcEfficiency(cow: Animal, records: ReproductionRecord[]): number | null {
+	function calcEfficiency(cow: Animal, births: BirthEvent[]): number | null {
 		const edad = ageInYears(cow.fecha_nacimiento);
 		if (edad === null || edad <= 2) return null;
-		const totalPartos = records.filter((r) => !!r.fecha_parto_real).length;
-		return totalPartos / (edad - 2);
+		return births.length / (edad - 2);
 	}
 
 	const SEMAFORO_CONFIG: Record<Semaforo, { dot: string; badge: string }> = {
@@ -282,6 +286,7 @@
 	let photoLookup = $state(new Map<string, string>());
 	let archivedMontas = $state(new Map<string, string>());
 	let montaCorrections = $state<MontaCorrection[]>([]);
+	let prenezRevocations = $state<PrenezRevocation[]>([]);
 	let correctionsNoticeOpen = $state(true);
 
 	const today = new Date();
@@ -323,10 +328,12 @@
 		const vacant = vacantCows.length;
 		const nearWeaning = nearWeaningCows.length;
 		const recent = cowStatuses.filter((c) => c.semaforo === 'verde').length;
-		const noHist = cowStatuses.filter((c) => c.records.length === 0).length;
+		const noHist = cowStatuses.filter(
+			(c) => c.records.length === 0 && c.births.length === 0
+		).length;
 
 		const iepValues = cowStatuses
-			.map((c) => calcIEP(c.records))
+			.map((c) => calcIEP(c.births))
 			.filter((v): v is number => v !== null);
 		const avgIEP =
 			iepValues.length > 0
@@ -334,10 +341,9 @@
 				: null;
 
 		const cutoff = format(subMonths(today, 12), 'yyyy-MM-dd');
-		const allRecords = cowStatuses.flatMap((c) => c.records);
-		const births12m = allRecords.filter(
-			(r) => r.fecha_parto_real && r.fecha_parto_real >= cutoff
-		).length;
+		const births12m = cowStatuses
+			.flatMap((c) => c.births)
+			.filter((b) => b.date >= cutoff).length;
 		const birthRate12m = total > 0 ? Math.round((births12m / total) * 100) : null;
 
 		return {
@@ -372,18 +378,14 @@
 	let selectedStatus = $derived(
 		cowStatuses.find((c) => c.cow.animal_id === selectedCowId) ?? null
 	);
-	let selectedIEP = $derived(selectedStatus ? calcIEP(selectedStatus.records) : null);
+	let selectedIEP = $derived(selectedStatus ? calcIEP(selectedStatus.births) : null);
 	let selectedEff = $derived(
-		selectedStatus ? calcEfficiency(selectedStatus.cow, selectedStatus.records) : null
+		selectedStatus ? calcEfficiency(selectedStatus.cow, selectedStatus.births) : null
 	);
 	let selectedAge = $derived(
 		selectedStatus ? ageInYears(selectedStatus.cow.fecha_nacimiento) : null
 	);
-	let selectedPartos = $derived(
-		selectedStatus
-			? selectedStatus.records.filter((r) => !!r.fecha_parto_real).length
-			: 0
-	);
+	let selectedPartos = $derived(selectedStatus ? selectedStatus.births.length : 0);
 
 	let shouldCull = $derived(selectedEff !== null && selectedEff < CULL_EFFICIENCY);
 
@@ -441,12 +443,13 @@
 		// a real birth would otherwise drive the whole page's inference.
 		const plan = planMontaReconciliation(storedRepro, activeAnimals);
 		let reproRecords = storedRepro;
-		if (plan.corrections.length > 0) {
-			await applyMontaCorrections(plan.corrections);
+		if (plan.corrections.length > 0 || plan.revocations.length > 0) {
+			await applyMontaReconciliation(plan);
 			reproRecords = await db.reproduction.where('deleted').equals(0).toArray();
 		}
 		montaCorrections = plan.corrections;
-		correctionsNoticeOpen = plan.corrections.length > 0;
+		prenezRevocations = plan.revocations;
+		correctionsNoticeOpen = plan.corrections.length > 0 || plan.revocations.length > 0;
 		archivedMontas = plan.archived;
 
 		animalLookup = new Map(activeAnimals.map((animal) => [animal.animal_id, animal]));
@@ -462,14 +465,11 @@
 			}
 		}
 		photoLookup = nextPhotoLookup;
-		const latestCalfBirthByMother = new Map<string, string>();
-		for (const animal of activeAnimals) {
-			const motherId = animal.madre_id?.trim();
-			if (!motherId || !animal.fecha_nacimiento) continue;
-			const currentLatest = latestCalfBirthByMother.get(motherId) ?? null;
-			const latestBirth = latestDateString(currentLatest, animal.fecha_nacimiento);
-			if (latestBirth) latestCalfBirthByMother.set(motherId, latestBirth);
-		}
+
+		// One deduplicated view of every calving, merging birth events and calves
+		// registered under a mother. Replaces the partial calf-only index this page
+		// used to build by hand, and now also feeds the semáforo and the KPIs.
+		const allBirths = birthsByCow(reproRecords, activeAnimals);
 
 		const cows = activeAnimals.filter(
 			(a) => a.sexo === 'Hembra' && a.estado !== 'Vendido(a)' && a.estado !== 'Muerto(a)'
@@ -477,15 +477,14 @@
 
 		cowStatuses = cows.map((cow) => {
 			const records = reproRecords.filter((r) => r.vaca_id === cow.animal_id);
-			const inferredStatus = inferSemaforo(records, today, plan.archived);
-			const lastCalfBirthDate = latestCalfBirthByMother.get(cow.animal_id) ?? null;
-			const lastBirthReferenceDate = latestDateString(
-				inferredStatus.lastPartoDate,
-				lastCalfBirthDate
-			);
+			const births = allBirths.get(cow.animal_id) ?? [];
+			const inferredStatus = inferSemaforo(records, today, plan.archived, births);
+			const lastCalfBirthDate = births.filter((b) => !b.fromRecord).at(-1)?.date ?? null;
+			const lastBirthReferenceDate = births.at(-1)?.date ?? null;
 			return {
 				cow,
 				records,
+				births,
 				...inferredStatus,
 				lastCalfBirthDate,
 				lastBirthReferenceDate,
@@ -590,15 +589,15 @@
 		</div>
 	</div>
 
-	<!-- Automatic monta date corrections -->
-	{#if correctionsNoticeOpen && montaCorrections.length > 0}
+	<!-- Automatic reconciliation of physically impossible records -->
+	{#if correctionsNoticeOpen && (montaCorrections.length > 0 || prenezRevocations.length > 0)}
 		<section class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
 			<div class="flex items-start justify-between gap-3">
 				<p class="text-sm font-bold text-sky-800">
-					{montaCorrections.length}
-					{montaCorrections.length === 1
-						? 'fecha de monta corregida automáticamente'
-						: 'fechas de monta corregidas automáticamente'}
+					{montaCorrections.length + prenezRevocations.length}
+					{montaCorrections.length + prenezRevocations.length === 1
+						? 'registro corregido automáticamente'
+						: 'registros corregidos automáticamente'}
 				</p>
 				<button
 					type="button"
@@ -608,26 +607,52 @@
 					Cerrar
 				</button>
 			</div>
-			<p class="mt-1 text-xs text-sky-700/80">
-				La vaca ya había parido antes del parto inferido, así que la monta se recorrió a {GESTATION_DAYS}
-				días antes del parto real.
-			</p>
-			<ul class="mt-2 space-y-1">
-				{#each montaCorrections as correction (correction.reproduccion_id)}
-					<li class="text-sm text-sky-950">
-						<a
-							href="/actividad/reproduccion/{correction.reproduccion_id}"
-							class="font-medium underline decoration-sky-300 underline-offset-2"
-						>
-							{animalLabel(correction.vaca_id)}
-						</a>
-						: {formatD(correction.previousMontaDate)} → {formatD(correction.correctedMontaDate)}
-						<span class="text-xs text-sky-700/80">
-							(parto {formatD(correction.birthDate)})
-						</span>
-					</li>
-				{/each}
-			</ul>
+
+			{#if montaCorrections.length > 0}
+				<p class="mt-2 text-xs text-sky-700/80">
+					La vaca ya había parido antes del parto inferido, así que la monta se recorrió a {GESTATION_DAYS}
+					días antes del parto real.
+				</p>
+				<ul class="mt-1 space-y-1">
+					{#each montaCorrections as correction (correction.reproduccion_id)}
+						<li class="text-sm text-sky-950">
+							<a
+								href="/actividad/reproduccion/{correction.reproduccion_id}"
+								class="font-medium underline decoration-sky-300 underline-offset-2"
+							>
+								{animalLabel(correction.vaca_id)}
+							</a>
+							: {formatD(correction.previousMontaDate)} → {formatD(correction.correctedMontaDate)}
+							<span class="text-xs text-sky-700/80">
+								(parto {formatD(correction.birthDate)})
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if prenezRevocations.length > 0}
+				<p class="mt-2 text-xs text-sky-700/80">
+					Se volvió a montar la vaca dentro de la gestación que estos registros afirmaban, así que
+					la preñez confirmada pasó a «No». Revisa si hubo aborto o pérdida.
+				</p>
+				<ul class="mt-1 space-y-1">
+					{#each prenezRevocations as revocation (revocation.reproduccion_id)}
+						<li class="text-sm text-sky-950">
+							<a
+								href="/actividad/reproduccion/{revocation.reproduccion_id}"
+								class="font-medium underline decoration-sky-300 underline-offset-2"
+							>
+								{animalLabel(revocation.vaca_id)}
+							</a>
+							: monta {formatD(revocation.montaDate)} → preñez «No»
+							<span class="text-xs text-sky-700/80">
+								(montada de nuevo el {formatD(revocation.laterMontaDate)})
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</section>
 	{/if}
 
@@ -1041,7 +1066,17 @@
 														{@const archivedBirth = archivedMontas.get(r.reproduccion_id)}
 														<tr class="border-b border-gray-50 last:border-b-0">
 															<td class="px-3 py-2 text-gray-700">
-																{formatD(r.fecha_monta)}
+																<span class="flex items-center gap-1.5">
+																	{formatD(r.fecha_monta)}
+																	<a
+																		href="/actividad/reproduccion/{r.reproduccion_id}/editar"
+																		class="shrink-0 rounded-full p-1 text-pink-600 transition-colors hover:bg-pink-100"
+																		aria-label="Editar registro del {formatD(r.fecha_monta)}"
+																		title="Editar — confirmar preñez, registrar parto"
+																	>
+																		<Pencil size={13} />
+																	</a>
+																</span>
 																{#if archivedBirth}
 																	<span
 																		class="mt-1 block w-fit rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
