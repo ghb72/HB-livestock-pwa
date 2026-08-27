@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-08-26
+
 ### Changed
 
 - Renamed the photo record's `drive_url` field to `photo_url` across the frontend, the API contract, and the docs — the old name was Google Drive-era residue and the field has held a Supabase Storage URL since the migration. An IndexedDB migration (Dexie v4) renames the field on existing devices, and the upload response carries a deprecated `drive_url` alias for one release so a client still running cached frontend code keeps working.

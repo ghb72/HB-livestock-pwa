@@ -1,8 +1,8 @@
-# HB Livestock PWA v2.1.0
+# HB Livestock PWA v2.1.1
 
 Offline-first Progressive Web App for livestock management.
 
-Current release: 2.1.0.
+Current release: 2.1.1.
 
 ## Overview
 
