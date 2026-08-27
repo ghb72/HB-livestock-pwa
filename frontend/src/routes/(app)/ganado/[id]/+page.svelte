@@ -342,7 +342,7 @@
 		<!-- Quick links -->
 		<div class="grid grid-cols-2 gap-3">
 			<a
-				href="/actividad/salud/nuevo?animal={animalId}"
+				href="/actividad/salud/individual?animal={animalId}"
 				class="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-3 text-sm font-medium text-blue-700 transition-colors active:opacity-80"
 			>
 				<HeartPulse size={18} />

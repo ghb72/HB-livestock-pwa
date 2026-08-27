@@ -293,9 +293,11 @@
 								{/if}
 								<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-semibold text-gray-800">
-									{animal.nombre || formatTagId(animal.arete_id) || animal.animal_id}
+									{animal.nombre || 'Sin nombre'}
 								</p>
-								<p class="truncate text-xs text-gray-400">{animal.animal_id}</p>
+								<p class="truncate text-xs text-gray-400">
+									{formatTagId(animal.arete_id) || '—'}
+								</p>
 								</div>
 							</div>
 							{#each selectedTypes as tipo}

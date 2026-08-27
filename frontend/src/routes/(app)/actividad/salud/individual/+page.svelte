@@ -7,6 +7,7 @@
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
 	import { todayLocalDate } from '$lib/date';
+	import { toAnimalOptions, type SelectOption } from '$lib/animalOptions';
 	import { createHealthRecord } from '$lib/store';
 	import type { TipoEventoSalud, EstadoGeneral } from '$lib/types';
 
@@ -23,7 +24,7 @@
 	const preselected = page.url.searchParams.get('animal') ?? '';
 
 	let saving = $state(false);
-	let animalOptions = $state<string[]>([]);
+	let animalOptions = $state<SelectOption[]>([]);
 
 	let form = $state({
 		animal_id: preselected,
@@ -42,13 +43,7 @@
 
 	async function loadAnimals() {
 		const all = await db.animals.where('deleted').equals(0).toArray();
-		animalOptions = all
-			.filter((a) => a.estado === 'Vivo(a)')
-			.map((a) => `${a.animal_id} - ${a.nombre}`);
-		if (preselected && !form.animal_id.includes(' - ')) {
-			const match = animalOptions.find((o) => o.startsWith(preselected));
-			if (match) form.animal_id = match;
-		}
+		animalOptions = toAnimalOptions(all.filter((a) => a.estado === 'Vivo(a)'));
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -57,7 +52,7 @@
 		saving = true;
 		try {
 			await createHealthRecord({
-				animal_id: form.animal_id.split(' - ')[0],
+				animal_id: form.animal_id,
 				fecha: form.fecha,
 				tipo_evento: form.tipo_evento as TipoEventoSalud,
 				producto: form.producto,

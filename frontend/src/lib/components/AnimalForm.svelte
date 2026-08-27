@@ -8,7 +8,7 @@
 	import PhotoCapture from './PhotoCapture.svelte';
 	import { db } from '$lib/db';
 	import { parseStoredDate, todayLocalDate } from '$lib/date';
-	import { formatTagId } from '$lib/helpers';
+	import { animalOptionLabel, type SelectOption } from '$lib/animalOptions';
 	import {
 		createAnimal,
 		createReproductionRecord,
@@ -21,11 +21,6 @@
 		deletePhoto
 	} from '$lib/store';
 	import type { AnimalTipo, Sexo, Temperamento, EstadoAnimal } from '$lib/types';
-
-	type SelectOption = {
-		value: string;
-		label: string;
-	};
 
 	interface Props {
 		animalId?: string;
@@ -83,18 +78,12 @@
 					a.estado === 'Vivo(a)' &&
 					(!animalId || a.animal_id !== animalId)
 			)
-			.map((a) => ({
-				value: a.animal_id,
-				label: `${a.nombre} ${formatTagId(a.arete_id)}`.trim()
-			}));
+			.map((a) => ({ value: a.animal_id, label: animalOptionLabel(a) }));
 		fathers = allAnimals
 			.filter(
 				(a) => a.tipo === 'Semental' && a.sexo === 'Macho' && (!animalId || a.animal_id !== animalId)
 			)
-			.map((a) => ({
-				value: a.animal_id,
-				label: `${a.nombre} ${formatTagId(a.arete_id)}`.trim()
-			}));
+			.map((a) => ({ value: a.animal_id, label: animalOptionLabel(a) }));
 	}
 
 	async function loadExisting(id: string) {

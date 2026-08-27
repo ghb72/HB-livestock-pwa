@@ -8,6 +8,7 @@
 	import PhotoCapture from '$lib/components/PhotoCapture.svelte';
 	import { db } from '$lib/db';
 	import { formatStoredDate, parseStoredDate, todayLocalDate } from '$lib/date';
+	import { toAnimalOptions, withSelected, type SelectOption } from '$lib/animalOptions';
 	import {
 		addPhoto,
 		createReproductionRecord,
@@ -23,11 +24,14 @@
 		POSTPARTUM_WAIT_DAYS,
 		type MontaWarning
 	} from '$lib/reproduction';
-	import type { Animal, PrenezEstado, ReproductionRecord } from '$lib/types';
+	import type { Animal, AnimalTipo, PrenezEstado, ReproductionRecord } from '$lib/types';
 
 	const PRENEZ_OPTIONS: PrenezEstado[] = ['Pendiente', 'Sí', 'No'];
 	const SEXOS = ['Macho', 'Hembra'] as const;
+	/** Stored bull id for a mating by a bull that is not in the herd. */
+	const EXTERNAL_BULL_VALUE = 'EXTERNO';
 	const EXTERNAL_BULL_LABEL = 'Toro externo (ver notas)';
+	const BULL_TIPOS: AnimalTipo[] = ['Semental', 'Torete'];
 
 	type EventMode = 'monta' | 'parto';
 
@@ -47,11 +51,6 @@
 	let mode = $state<EventMode>('monta');
 	let userEditedMonta = $state(false);
 	let userEditedParto = $state(false);
-
-	let cows = $state<string[]>([]);
-	let bullOptions = $state<string[]>([]);
-	let allAnimalOptions = $state<string[]>([]);
-	let animalLabelMap = $state(new Map<string, string>());
 
 	let form = $state({
 		vaca_id: preselected,
@@ -73,9 +72,42 @@
 	});
 	let calfPhoto = $state('');
 
-	// Consistency checks need the whole herd, not just the option labels.
+	// Consistency checks need the whole herd, not just the ones offered as options.
 	let allRecords = $state<ReproductionRecord[]>([]);
 	let allAnimals = $state<Animal[]>([]);
+
+	// Selectors only offer live animals, but an older record may point at one that has
+	// since died or been sold — `withSelected` keeps that animal visible so editing the
+	// record does not silently drop the link.
+	let cows = $derived(
+		withSelected(
+			toAnimalOptions(
+				allAnimals.filter((animal) => animal.sexo === 'Hembra' && animal.estado === 'Vivo(a)')
+			),
+			allAnimals,
+			form.vaca_id
+		)
+	);
+	let bullOptions = $derived([
+		...withSelected(
+			toAnimalOptions(
+				allAnimals.filter(
+					(animal) => BULL_TIPOS.includes(animal.tipo) && animal.estado === 'Vivo(a)'
+				)
+			),
+			allAnimals,
+			form.semental_id === EXTERNAL_BULL_VALUE ? '' : form.semental_id
+		),
+		{ value: EXTERNAL_BULL_VALUE, label: EXTERNAL_BULL_LABEL }
+	]);
+	let allAnimalOptions = $derived(
+		withSelected(
+			toAnimalOptions(allAnimals.filter((animal) => animal.estado === 'Vivo(a)')),
+			allAnimals,
+			form.cria_id
+		)
+	);
+
 	/** Editable note written onto the confirmation this monta withdraws. */
 	let revocationNoteDraft = $state('');
 	let revocationNoteTouched = $state(false);
@@ -92,7 +124,7 @@
 	let montaWarnings = $derived.by((): MontaWarning[] => {
 		if (readonly || mode !== 'monta' || !form.vaca_id || !form.fecha_monta) return [];
 		return checkMontaWarnings(
-			extractId(form.vaca_id),
+			form.vaca_id,
 			form.fecha_monta,
 			allRecords,
 			allAnimals,
@@ -116,7 +148,7 @@
 	let partoWarning = $derived.by(() => {
 		if (readonly || mode !== 'parto' || !form.vaca_id || !form.fecha_parto_real) return undefined;
 		return checkPartoWarnings(
-			extractId(form.vaca_id),
+			form.vaca_id,
 			form.fecha_parto_real,
 			allRecords,
 			allAnimals,
@@ -131,7 +163,7 @@
 		if (!revocationNoteTouched) revocationNoteDraft = suggested;
 	});
 
-	let isExternalBull = $derived(form.semental_id === EXTERNAL_BULL_LABEL);
+	let isExternalBull = $derived(form.semental_id === EXTERNAL_BULL_VALUE);
 	let isExistingRecord = $derived(!!reproductionId);
 	let modeLocked = $derived(readonly || isExistingRecord);
 	let showCalfCreation = $derived(!readonly && !isExistingRecord && mode === 'parto');
@@ -158,18 +190,6 @@
 		]);
 		allAnimals = animals;
 		allRecords = records;
-		animalLabelMap = new Map(animals.map((animal) => [animal.animal_id, `${animal.animal_id} - ${animal.nombre}`]));
-
-		cows = animals
-			.filter((animal) => animal.sexo === 'Hembra')
-			.map((animal) => `${animal.animal_id} - ${animal.nombre}`);
-		bullOptions = [
-			...animals
-				.filter((animal) => animal.sexo === 'Macho')
-				.map((animal) => `${animal.animal_id} - ${animal.nombre}`),
-			EXTERNAL_BULL_LABEL
-		];
-		allAnimalOptions = animals.map((animal) => `${animal.animal_id} - ${animal.nombre}`);
 
 		if (reproductionId) {
 			const record = await getReproductionRecord(reproductionId);
@@ -178,10 +198,6 @@
 			}
 		} else {
 			resetFormForCreate();
-			if (preselected && !form.vaca_id.includes(' - ')) {
-				const match = cows.find((option) => option.startsWith(preselected));
-				if (match) form.vaca_id = match;
-			}
 		}
 
 		loaded = true;
@@ -209,19 +225,15 @@
 		calfPhoto = '';
 	}
 
-	function toOptionValue(id: string) {
-		return animalLabelMap.get(id) ?? id;
-	}
-
 	function loadRecord(record: ReproductionRecord) {
 		mode = record.fecha_parto_real ? 'parto' : 'monta';
 		form = {
-			vaca_id: toOptionValue(record.vaca_id),
-			semental_id: record.semental_id === 'EXTERNO' ? EXTERNAL_BULL_LABEL : toOptionValue(record.semental_id),
+			vaca_id: record.vaca_id,
+			semental_id: record.semental_id,
 			fecha_monta: record.fecha_monta,
 			prenez_confirmada: record.prenez_confirmada,
 			fecha_parto_real: record.fecha_parto_real,
-			cria_id: record.cria_id ? toOptionValue(record.cria_id) : '',
+			cria_id: record.cria_id,
 			peso_destete_cria: record.peso_destete_cria ? String(record.peso_destete_cria) : '',
 			notas: record.notas
 		};
@@ -248,18 +260,14 @@
 		}
 	}
 
-	function extractId(value: string) {
-		return value.split(' - ')[0] ?? value;
-	}
-
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		if (saving || readonly) return;
 		saving = true;
 
 		try {
-			const vacaId = extractId(form.vaca_id);
-			const sementalId = isExternalBull ? 'EXTERNO' : extractId(form.semental_id);
+			const vacaId = form.vaca_id;
+			const sementalId = form.semental_id;
 			const reproductionPayload = {
 				vaca_id: vacaId,
 				semental_id: sementalId,
@@ -267,7 +275,7 @@
 				fecha_posible_parto: fechaPosibleParto,
 				prenez_confirmada: mode === 'parto' ? ('Sí' as PrenezEstado) : (form.prenez_confirmada as PrenezEstado),
 				fecha_parto_real: mode === 'parto' ? form.fecha_parto_real : '',
-				cria_id: form.cria_id ? extractId(form.cria_id) : '',
+				cria_id: form.cria_id,
 				peso_destete_cria: form.peso_destete_cria ? Number(form.peso_destete_cria) : null,
 				notas: form.notas
 			};
