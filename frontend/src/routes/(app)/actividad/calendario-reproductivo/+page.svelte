@@ -705,7 +705,6 @@
 			label: 'Sin historial',
 			value: `${herdKPIs.noHistory}`,
 			sub: `de ${herdKPIs.breedingCows} adultas`,
-			note: 'sin registros reproductivos',
 			color: 'border-slate-200 bg-slate-50 text-slate-700'
 		},
 		{
