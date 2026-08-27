@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { login } from '$lib/api';
 
 	let token = $state('');
@@ -16,7 +16,7 @@
 		try {
 			const ok = await login(token.trim());
 			if (ok) {
-				goto('/');
+				replaceWith('/');
 			} else {
 				error = 'Token inválido. Intenta de nuevo.';
 			}

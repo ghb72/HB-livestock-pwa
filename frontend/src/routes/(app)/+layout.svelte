@@ -4,6 +4,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { initSync } from '$lib/sync';
+	import { initHistoryTracking } from '$lib/navigation.svelte';
 
 	interface Props {
 		children: Snippet;
@@ -11,6 +12,9 @@
 
 	let { children }: Props = $props();
 	let cleanupSync: (() => void) | undefined;
+
+	// Must run during component init, not in onMount.
+	initHistoryTracking();
 
 	onMount(() => {
 		cleanupSync = initSync();

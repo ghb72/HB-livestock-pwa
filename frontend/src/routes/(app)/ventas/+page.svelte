@@ -1,52 +1,30 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { Plus, DollarSign } from 'lucide-svelte';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
-	import { db } from '$lib/db';
 	import { formatStoredDate } from '$lib/date';
-	import { formatTagId } from '$lib/helpers';
 	import Card from '$lib/components/Card.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
-	import type { Sale } from '$lib/types';
+	import type { PageData } from './$types';
 
-	let sales = $state<Sale[]>([]);
-	let animalMap = $state(new Map<string, string>());
-	let photoMap = $state(new Map<string, string>());
+	let { data }: { data: PageData } = $props();
+
+	const sales = $derived(data.sales);
+	const animalMap = $derived(data.animalMap);
+	const photoMap = $derived(data.photoMap);
 
 	let totalRevenue = $derived(sales.reduce((s, v) => s + (v.precio_total ?? 0), 0));
 	let totalWeight = $derived(sales.reduce((s, v) => s + (v.peso ?? 0), 0));
 	let avgPriceKg = $derived(totalWeight > 0 ? (totalRevenue / totalWeight).toFixed(2) : '0');
 
-	$effect(() => {
-		loadData();
+	onMount(() => {
+		const handler = () => invalidateAll();
+		window.addEventListener('sync-complete', handler);
+		return () => window.removeEventListener('sync-complete', handler);
 	});
-
-	async function loadData() {
-		const [allSales, allAnimals, allPhotos] = await Promise.all([
-			db.sales.where('deleted').equals(0).toArray(),
-			db.animals.toArray(),
-			db.photos.toArray()
-		]);
-		sales = allSales.sort((a, b) => b.fecha_venta.localeCompare(a.fecha_venta));
-		animalMap = new Map(
-			allAnimals.map((a) => [a.animal_id, a.nombre || formatTagId(a.arete_id) || a.animal_id])
-		);
-
-		const photos = new Map<string, string>();
-		for (const animal of allAnimals) {
-			if (animal.foto_url) {
-				photos.set(animal.animal_id, animal.foto_url);
-			}
-		}
-		for (const photo of allPhotos) {
-			if (photo.deleted === 0) {
-				photos.set(photo.animal_id, photo.data_url || photo.drive_url);
-			}
-		}
-		photoMap = photos;
-	}
 
 	function formatDate(dateStr: string): string {
 		if (!dateStr) return '';

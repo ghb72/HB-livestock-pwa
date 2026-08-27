@@ -1,0 +1,152 @@
+# Local test stack for HB Livestock PWA.
+#
+# The backend never speaks SQL: backend/app/services/supabase.py talks HTTP to
+# PostgREST (/rest/v1) and to the Supabase Storage API (/storage/v1), so a bare
+# Postgres container cannot back it. This is the minimum subset of a self-hosted
+# Supabase that can: Postgres, PostgREST, storage-api, and an nginx gateway that
+# puts both APIs on one origin the way Kong does in a hosted project.
+#
+# Deliberately absent, because the app uses none of them: GoTrue (auth is a
+# single shared secret in AUTH_TOKEN), Realtime, Studio, imgproxy, the connection
+# pooler, and the analytics/logging stack.
+#
+#   docker compose up -d
+#   docker compose logs -f bootstrap     # wait for "Local Supabase stack is ready"
+#   docker compose down -v               # reset to an empty database
+#
+# SECURITY: the JWT secret and keys below are Supabase's *published demo values*.
+# They are safe only because this stack listens on localhost and holds throwaway
+# data. Never reuse them for the real Supabase project.
+
+name: hb-livestock-local
+
+x-postgres-password: &postgres-password postgres
+x-jwt-secret: &jwt-secret your-super-secret-jwt-token-with-at-least-32-characters-long
+x-anon-key: &anon-key eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+x-service-role-key: &service-role-key eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.136
+    container_name: livestock-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_DB: postgres
+      POSTGRES_PORT: 5432
+      PGPORT: 5432
+      POSTGRES_PASSWORD: *postgres-password
+      PGPASSWORD: *postgres-password
+      JWT_SECRET: *jwt-secret
+      JWT_EXP: 3600
+    ports:
+      # Exposed for psql / a GUI client. Not 5432, to avoid colliding with any
+      # Postgres already installed on the host.
+      - "54322:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Mounted as a single file, not as a directory: mounting over
+      # migrations/ would hide the 53 migrations the image ships.
+      - ./docker/db-init/99999999000000_local-roles.sql:/docker-entrypoint-initdb.d/migrations/99999999000000_local-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      # The entrypoint starts, migrates and restarts the server, so early probes
+      # can hit a server that is about to go down again.
+      start_period: 40s
+
+  rest:
+    image: postgrest/postgrest:v14.12
+    container_name: livestock-rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:postgres@db:5432/postgres
+      # storage is exposed because storage-api reaches its own tables through
+      # PostgREST, not only because the app needs the public schema.
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_JWT_SECRET: *jwt-secret
+      PGRST_APP_SETTINGS_JWT_SECRET: *jwt-secret
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+
+  storage:
+    image: supabase/storage-api:v1.60.4
+    container_name: livestock-storage
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    environment:
+      ANON_KEY: *anon-key
+      SERVICE_KEY: *service-role-key
+      AUTH_JWT_SECRET: *jwt-secret
+      POSTGREST_URL: http://rest:3000
+      DATABASE_URL: postgres://supabase_storage_admin:postgres@db:5432/postgres
+      # What storage-api prefixes onto the public URLs it hands back; it must
+      # match SUPABASE_URL in backend/.env.development.
+      STORAGE_PUBLIC_URL: http://127.0.0.1:54321
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      FILE_SIZE_LIMIT: 52428800
+      # Required by the config loader even with STORAGE_BACKEND=file.
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      # imgproxy is not part of this stack.
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - storage_data:/var/lib/storage
+    healthcheck:
+      # 127.0.0.1, not localhost: the container resolves localhost to [::1]
+      # first and storage-api binds IPv4 only, so the probe is refused.
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/status || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: livestock-gateway
+    restart: unless-stopped
+    depends_on:
+      rest:
+        condition: service_started
+      storage:
+        condition: service_healthy
+    ports:
+      - "54321:8000"
+    volumes:
+      - ./docker/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+
+  bootstrap:
+    image: supabase/postgres:17.6.1.136
+    container_name: livestock-bootstrap
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: *postgres-password
+    entrypoint: ["/bootstrap.sh"]
+    volumes:
+      - ./docker/bootstrap.sh:/bootstrap.sh:ro
+      - ./docker/verify.sql:/verify.sql:ro
+      # The production schema is the single source of truth; it is mounted, not
+      # copied, so the local stack can never drift from it.
+      - ./backend/data:/schema:ro
+
+volumes:
+  db_data:
+  storage_data:

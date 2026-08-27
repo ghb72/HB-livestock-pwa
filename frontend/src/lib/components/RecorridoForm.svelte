@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { format } from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import {
-		ArrowLeft,
 		Check,
 		ChevronDown,
 		ChevronUp,
@@ -12,7 +11,9 @@
 		MapPin,
 		Save
 	} from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import DateField from '$lib/components/DateField.svelte';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId, formatTagId } from '$lib/helpers';
@@ -58,7 +59,7 @@
 	async function loadAnimals() {
 		const [allAnimals, allPhotos] = await Promise.all([
 			db.animals.where('estado').equals('Vivo(a)').sortBy('nombre'),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 
 		const nextPhotoMap = new Map<string, string>();
@@ -69,7 +70,7 @@
 		}
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 
@@ -85,7 +86,7 @@
 			);
 
 			if (entries.length === 0) {
-				goto('/actividad/recorridos', { replaceState: true });
+				replaceWith('/actividad/recorridos');
 				return;
 			}
 
@@ -146,7 +147,7 @@
 				await db.recorridos.bulkAdd(entries);
 			});
 
-			goto('/actividad/recorridos', { replaceState: true });
+			replaceWith('/actividad/recorridos');
 		} finally {
 			saving = false;
 		}
@@ -163,13 +164,7 @@
 
 <div class="mx-auto max-w-lg space-y-4 pb-24">
 	<div class="flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/actividad/recorridos" />
 		<div>
 			<div class="flex items-center gap-2">
 				<MapPin size={22} class="text-green-600" />

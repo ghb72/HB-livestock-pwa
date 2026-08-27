@@ -1,8 +1,11 @@
 <script lang="ts">
-	import { ArrowLeft, Save, Check, StickyNote, X, Loader2 } from 'lucide-svelte';
+	import { goBack } from '$lib/navigation.svelte';
+	import { Save, Check, StickyNote, X, Loader2 } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import FormField from '$lib/components/FormField.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { todayLocalDate } from '$lib/date';
 	import { generateId, now, currentUserId, formatTagId } from '$lib/helpers';
 	import type { Animal, TipoEventoSalud, EstadoGeneral, HealthRecord } from '$lib/types';
@@ -58,7 +61,7 @@
 				.equals(0)
 				.filter((a) => a.estado === 'Vivo(a)')
 				.toArray(),
-			db.photos.toArray()
+			getAllPhotos()
 		]);
 
 		allAnimals.sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'));
@@ -71,7 +74,7 @@
 		}
 		for (const photo of allPhotos) {
 			if (photo.deleted === 0) {
-				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 
@@ -164,7 +167,7 @@
 			}
 
 			await db.health.bulkAdd(records);
-			history.back();
+			goBack('/actividad');
 		} finally {
 			saving = false;
 		}
@@ -173,13 +176,7 @@
 
 <div class="mx-auto max-w-lg space-y-4 pb-6">
 	<div class="flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/actividad" />
 		<h2 class="text-xl font-bold text-gray-800">Evento de salud masivo</h2>
 	</div>
 
@@ -296,9 +293,11 @@
 								{/if}
 								<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-semibold text-gray-800">
-									{animal.nombre || formatTagId(animal.arete_id) || animal.animal_id}
+									{animal.nombre || 'Sin nombre'}
 								</p>
-								<p class="truncate text-xs text-gray-400">{animal.animal_id}</p>
+								<p class="truncate text-xs text-gray-400">
+									{formatTagId(animal.arete_id) || '—'}
+								</p>
 								</div>
 							</div>
 							{#each selectedTypes as tipo}

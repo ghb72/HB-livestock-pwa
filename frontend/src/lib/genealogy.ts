@@ -182,7 +182,7 @@ export function createGenealogySource(
 
 	for (const photo of photos) {
 		if (photo.deleted === 0) {
-			photoMap.set(photo.animal_id, photo.data_url || photo.drive_url);
+			photoMap.set(photo.animal_id, photo.data_url || photo.photo_url);
 		}
 	}
 

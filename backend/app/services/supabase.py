@@ -68,8 +68,13 @@ def _request(
     json: object | None = None,
     content: bytes | None = None,
     headers: dict[str, str] | None = None,
+    ok_statuses: set[int] | None = None,
 ) -> httpx.Response:
-    """Run an authenticated request against Supabase and raise a readable error."""
+    """Run an authenticated request against Supabase and raise a readable error.
+
+    ``ok_statuses`` lists error codes to accept as success. Only the storage
+    delete uses it, to stay idempotent when an object is already gone.
+    """
     url = f"{get_settings()['url']}{path}"
     request_headers = _headers()
     if headers:
@@ -84,6 +89,9 @@ def _request(
         headers=request_headers,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
+
+    if ok_statuses and response.status_code in ok_statuses:
+        return response
 
     try:
         response.raise_for_status()
@@ -173,13 +181,21 @@ def upload_storage_object(path: str, content: bytes, content_type: str) -> None:
 
 
 def delete_storage_object(path: str) -> None:
-    """Delete a storage object from the configured Supabase bucket."""
+    """Delete a storage object from the configured Supabase bucket.
+
+    Missing objects are not an error: an offline client can only report a
+    deletion long after the file was removed by hand from the Supabase panel,
+    and failing here would leave that client retrying the same row forever.
+    Storage answers 404 for a missing object, and 400 {"error": "not_found"}
+    on older versions.
+    """
     bucket = get_settings()["bucket"]
     safe_path = quote(path, safe="/")
     _request(
         "DELETE",
         f"/storage/v1/object/{bucket}/{safe_path}",
         headers={"Prefer": "return=minimal"},
+        ok_statuses={400, 404},
     )
 
 
@@ -220,13 +236,19 @@ def upload_photo(photo_id: str, base64_data: str) -> str:
 def delete_photo(photo_id: str, file_url: str) -> bool:
     """Delete a photo from Supabase Storage by its public URL.
 
+    Returns True whenever the object is gone as far as this bucket is
+    concerned — including a blank URL or one pointing somewhere else, such as a
+    leftover Google Drive link, where there is nothing of ours to remove. False
+    is reserved for genuine failures, so a caller can safely drop its local row
+    on True and retry on False.
+
     The photo_id argument is preserved for compatibility with existing callers.
     """
     del photo_id
     try:
         storage_path = extract_storage_path(file_url)
         if not storage_path:
-            return False
+            return True
         delete_storage_object(storage_path)
         return True
     except Exception:

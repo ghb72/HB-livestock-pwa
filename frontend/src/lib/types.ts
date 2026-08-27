@@ -124,7 +124,7 @@ export interface AnimalPhoto {
 	photo_id: string;
 	animal_id: string;
 	data_url: string;
-	drive_url: string;
+	photo_url: string;
 	synced: 0 | 1;
 	deleted: 0 | 1;
 	created_at: string;

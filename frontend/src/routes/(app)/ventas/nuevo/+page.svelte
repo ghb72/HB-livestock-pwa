@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { page } from '$app/state';
-	import { ArrowLeft, Save } from 'lucide-svelte';
+	import { Save } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import FormField from '$lib/components/FormField.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { db } from '$lib/db';
 	import { todayLocalDate } from '$lib/date';
+	import { toAnimalOptions, type SelectOption } from '$lib/animalOptions';
 	import { createSale, updateAnimal } from '$lib/store';
 	import type { MotivoVenta } from '$lib/types';
 
@@ -19,7 +21,7 @@
 	const preselected = page.url.searchParams.get('animal') ?? '';
 
 	let saving = $state(false);
-	let animalOptions = $state<string[]>([]);
+	let animalOptions = $state<SelectOption[]>([]);
 
 	let form = $state({
 		animal_id: preselected,
@@ -43,13 +45,7 @@
 
 	async function loadAnimals() {
 		const all = await db.animals.where('deleted').equals(0).toArray();
-		animalOptions = all
-			.filter((a) => a.estado === 'Vivo(a)')
-			.map((a) => `${a.animal_id} - ${a.nombre}`);
-		if (preselected && !form.animal_id.includes(' - ')) {
-			const match = animalOptions.find((o) => o.startsWith(preselected));
-			if (match) form.animal_id = match;
-		}
+		animalOptions = toAnimalOptions(all.filter((a) => a.estado === 'Vivo(a)'));
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -57,7 +53,7 @@
 		if (saving) return;
 		saving = true;
 		try {
-			const animalId = form.animal_id.split(' - ')[0];
+			const animalId = form.animal_id;
 
 			await createSale({
 				animal_id: animalId,
@@ -71,7 +67,7 @@
 			});
 
 			await updateAnimal(animalId, { estado: 'Vendido(a)' });
-			goto('/ventas', { replaceState: true });
+			replaceWith('/ventas');
 		} finally {
 			saving = false;
 		}
@@ -80,13 +76,7 @@
 
 <div class="mx-auto max-w-lg">
 	<div class="mb-4 flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/ventas" />
 		<h2 class="text-xl font-bold text-gray-800">Registrar venta</h2>
 	</div>
 

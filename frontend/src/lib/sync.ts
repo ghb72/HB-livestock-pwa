@@ -22,6 +22,7 @@ import {
 	apiSyncTable,
 	apiPullAll,
 	apiUploadPhotos,
+	apiDeletePhoto,
 	isAuthenticated
 } from './api';
 import { now } from './helpers';
@@ -187,51 +188,100 @@ async function syncTableRecords(config: TableConfig): Promise<number> {
 
 // ── Photo sync ───────────────────────────────────────────
 
+/**
+ * Remove soft-deleted photos from Supabase Storage and then from IndexedDB.
+ *
+ * Photos have no remote table, so they never pass through syncTableRecords()
+ * and its soft-delete cleanup. Without this pass a deleted photo stays at
+ * `deleted: 1, synced: 0` forever and is counted as a pending change on every
+ * poll. A row that fails here is left untouched so the next cycle retries it —
+ * marking it synced would only strand it under a different flag.
+ */
+async function purgeDeletedPhotos(): Promise<number> {
+	const deletedPhotos: AnimalPhoto[] = await db.photos
+		.where('deleted')
+		.equals(1)
+		.toArray();
+
+	let purged = 0;
+	for (const photo of deletedPhotos) {
+		try {
+			if (photo.photo_url) {
+				// The backend treats an object that is already gone as success,
+				// so a file deleted straight from Supabase cannot block the row.
+				await apiDeletePhoto(photo.photo_id, photo.photo_url);
+			}
+			await db.photos.delete(photo.photo_id);
+			purged += 1;
+		} catch (error) {
+			console.error(`Photo purge failed for ${photo.photo_id}`, error);
+		}
+	}
+
+	return purged;
+}
+
 async function syncPhotos(): Promise<number> {
 	try {
-		const pending: AnimalPhoto[] = await db.photos
-			.where('synced')
-			.equals(0)
-			.filter((p) => p.deleted === 0 && !!p.data_url)
-			.toArray();
-
-		if (pending.length === 0) return 0;
-
-		const result = await apiUploadPhotos(
-			pending.map((p) => ({
-				photo_id: p.photo_id,
-				animal_id: p.animal_id,
-				data_url: p.data_url
-			}))
-		);
-		const { uploaded, errors } = result;
-
-		await db.transaction('rw', db.photos, db.animals, async () => {
-			for (const item of uploaded) {
-				await db.photos.update(item.photo_id, {
-					drive_url: item.drive_url,
-					synced: 1
-				});
-				await db.animals
-					.where('animal_id')
-					.equals(item.animal_id)
-					.modify({
-						foto_url: item.drive_url,
-						synced: 0,
-						updated_at: now()
-					});
+		// The purge sits in a finally so it runs in every case: when there is
+		// nothing to upload (the state a device with only deletions is in), and
+		// when the upload batch throws on partial errors. Placing it after the
+		// uploads matters for replaced photos — the animal's foto_url must point
+		// at the new object before the old one leaves the bucket.
+		try {
+			return await uploadPendingPhotos();
+		} finally {
+			try {
+				await purgeDeletedPhotos();
+			} catch (error) {
+				console.error('Photo purge failed', error);
 			}
-		});
-
-		if (errors.length > 0) {
-			throw new ApiError(502, errors.map((item) => `${item.photo_id}: ${item.error}`).join(' | '));
 		}
-
-		return uploaded.length;
 	} catch (error) {
 		console.error('Photo sync failed', error);
 		throw error;
 	}
+}
+
+async function uploadPendingPhotos(): Promise<number> {
+	const pending: AnimalPhoto[] = await db.photos
+		.where('synced')
+		.equals(0)
+		.filter((p) => p.deleted === 0 && !!p.data_url)
+		.toArray();
+
+	if (pending.length === 0) return 0;
+
+	const { uploaded, errors } = await apiUploadPhotos(
+		pending.map((p) => ({
+			photo_id: p.photo_id,
+			animal_id: p.animal_id,
+			data_url: p.data_url
+		}))
+	);
+
+	await db.transaction('rw', db.photos, db.animals, async () => {
+		for (const item of uploaded) {
+			await db.photos.update(item.photo_id, {
+				photo_url: item.photo_url,
+				synced: 1
+			});
+			await db.animals
+				.where('animal_id')
+				.equals(item.animal_id)
+				.modify({
+					foto_url: item.photo_url,
+					synced: 0,
+					updated_at: now()
+				});
+		}
+	});
+
+	if (errors.length > 0) {
+		throw new ApiError(502, errors.map((item) => `${item.photo_id}: ${item.error}`).join(' | '));
+	}
+
+	return uploaded.length;
 }
 
 // ── Batch pull helper ────────────────────────────────────
@@ -289,7 +339,7 @@ async function warmRemotePhotoCache(): Promise<void> {
 	]);
 
 	const cachedPhotoUrls = new Set(
-		photos.filter((photo) => !!photo.data_url).map((photo) => photo.drive_url).filter(Boolean)
+		photos.filter((photo) => !!photo.data_url).map((photo) => photo.photo_url).filter(Boolean)
 	);
 
 	const remoteUrls = new Set<string>();
@@ -299,8 +349,8 @@ async function warmRemotePhotoCache(): Promise<void> {
 		}
 	}
 	for (const photo of photos) {
-		if (photo.drive_url && !photo.data_url) {
-			remoteUrls.add(photo.drive_url);
+		if (photo.photo_url && !photo.data_url) {
+			remoteUrls.add(photo.photo_url);
 		}
 	}
 

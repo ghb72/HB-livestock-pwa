@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { ArrowLeft, Save } from 'lucide-svelte';
+	import { replaceWith } from '$lib/navigation.svelte';
+	import { Save } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { format, subDays } from 'date-fns';
 	import FormField from './FormField.svelte';
 	import SelectField from './SelectField.svelte';
 	import PhotoCapture from './PhotoCapture.svelte';
 	import { db } from '$lib/db';
 	import { parseStoredDate, todayLocalDate } from '$lib/date';
-	import { formatTagId } from '$lib/helpers';
+	import { animalOptionLabel, type SelectOption } from '$lib/animalOptions';
 	import {
 		createAnimal,
 		createReproductionRecord,
@@ -20,11 +21,6 @@
 		deletePhoto
 	} from '$lib/store';
 	import type { AnimalTipo, Sexo, Temperamento, EstadoAnimal } from '$lib/types';
-
-	type SelectOption = {
-		value: string;
-		label: string;
-	};
 
 	interface Props {
 		animalId?: string;
@@ -82,18 +78,12 @@
 					a.estado === 'Vivo(a)' &&
 					(!animalId || a.animal_id !== animalId)
 			)
-			.map((a) => ({
-				value: a.animal_id,
-				label: `${a.nombre} ${formatTagId(a.arete_id)}`.trim()
-			}));
+			.map((a) => ({ value: a.animal_id, label: animalOptionLabel(a) }));
 		fathers = allAnimals
 			.filter(
 				(a) => a.tipo === 'Semental' && a.sexo === 'Macho' && (!animalId || a.animal_id !== animalId)
 			)
-			.map((a) => ({
-				value: a.animal_id,
-				label: `${a.nombre} ${formatTagId(a.arete_id)}`.trim()
-			}));
+			.map((a) => ({ value: a.animal_id, label: animalOptionLabel(a) }));
 	}
 
 	async function loadExisting(id: string) {
@@ -118,7 +108,7 @@
 
 		const photos = await getPhotos(id);
 		if (photos.length > 0) {
-			photoData = photos[0].data_url || photos[0].drive_url;
+			photoData = photos[0].data_url || photos[0].photo_url;
 		} else if (existing.foto_url) {
 			photoData = existing.foto_url;
 		}
@@ -213,7 +203,7 @@
 				}
 			}
 
-			goto('/ganado', { replaceState: true });
+			replaceWith('/ganado');
 		} finally {
 			saving = false;
 		}
@@ -222,13 +212,7 @@
 
 <div class="mx-auto max-w-lg">
 	<div class="mb-4 flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/ganado" />
 		<h2 class="text-xl font-bold text-gray-800">
 			{isEdit ? 'Editar animal' : 'Registrar animal'}
 		</h2>

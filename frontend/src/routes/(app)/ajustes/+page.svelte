@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ArrowLeft, Database, Wifi, WifiOff, Trash2 } from 'lucide-svelte';
+	import { Database, Wifi, WifiOff, Trash2 } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { db } from '$lib/db';
 	import { countPendingChanges } from '$lib/sync';
 	import Card from '$lib/components/Card.svelte';
@@ -63,13 +64,7 @@
 
 <div class="mx-auto max-w-lg space-y-4">
 	<div class="flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/" />
 		<h2 class="text-xl font-bold text-gray-800">Ajustes</h2>
 	</div>
 

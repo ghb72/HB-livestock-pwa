@@ -240,12 +240,17 @@ export async function getPhotos(animalId: string): Promise<AnimalPhoto[]> {
 		.toArray();
 }
 
+/** Every photo still visible to the user — soft-deleted rows excluded. */
+export async function getAllPhotos(): Promise<AnimalPhoto[]> {
+	return db.photos.where('deleted').equals(0).toArray();
+}
+
 export async function addPhoto(animalId: string, dataUrl: string): Promise<AnimalPhoto> {
 	const record: AnimalPhoto = {
 		photo_id: generateId('PHO'),
 		animal_id: animalId,
 		data_url: dataUrl,
-		drive_url: '',
+		photo_url: '',
 		synced: 0,
 		deleted: 0,
 		created_at: new Date().toISOString()
@@ -255,5 +260,25 @@ export async function addPhoto(animalId: string, dataUrl: string): Promise<Anima
 }
 
 export async function deletePhoto(id: string): Promise<void> {
+	const photo = await db.photos.get(id);
+	if (!photo) return;
+
+	if (!photo.photo_url) {
+		// Never uploaded: there is nothing in the bucket to purge, so skip the
+		// soft-delete state entirely instead of leaving a row the sync engine
+		// would have to carry around.
+		await db.photos.delete(id);
+		return;
+	}
+
+	// The animal carries a copy of the URL (written by the sync engine once the
+	// upload lands), so clearing it here is what makes the removal reach the
+	// other devices — the photos table itself has no remote counterpart.
+	await db.animals
+		.where('animal_id')
+		.equals(photo.animal_id)
+		.filter((a: Animal) => a.foto_url === photo.photo_url)
+		.modify({ foto_url: '', synced: 0, updated_at: now() });
+
 	await db.photos.update(id, { deleted: 1, synced: 0 });
 }

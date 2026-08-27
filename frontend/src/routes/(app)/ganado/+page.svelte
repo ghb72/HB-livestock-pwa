@@ -1,90 +1,70 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { onMount, untrack } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Plus, Beef, AlertTriangle, ArrowUpDown, GitBranch } from 'lucide-svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ZoomablePhoto from '$lib/components/ZoomablePhoto.svelte';
-	import { db } from '$lib/db';
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { formatTagId } from '$lib/helpers';
-	import { computeMissingAnimals, type MissingAnimalInfo } from '$lib/missingAnimals';
-	import type { Animal, AnimalTipo } from '$lib/types';
+	import type { AnimalTipo } from '$lib/types';
+	import { DEFAULT_SORT, SORT_LABELS } from './sort';
+	import type { PageData } from './$types';
 
-	type SortOption = 'nombre_asc' | 'nombre_desc' | 'reciente' | 'antiguo' | 'edad_desc' | 'edad_asc';
+	let { data }: { data: PageData } = $props();
 
-	const SORT_LABELS: Record<SortOption, string> = {
-		nombre_asc: 'Nombre A→Z',
-		nombre_desc: 'Nombre Z→A',
-		reciente: 'Más nuevo',
-		antiguo: 'Más antiguo',
-		edad_desc: 'Mayor edad',
-		edad_asc: 'Menor edad'
-	};
+	const animals = $derived(data.animals);
+	const photoMap = $derived(data.photoMap);
+	const missingInfo = $derived(data.missingInfo);
+	const filterTipo = $derived(data.filterTipo);
+	const sortBy = $derived(data.sortBy);
 
 	const TIPO_FILTERS: AnimalTipo[] = ['Vaca', 'Semental', 'Becerro(a)', 'Vaquilla', 'Torete'];
 
-	let search = $state('');
-	let filterTipo = $state('');
-	let sortBy = $state<SortOption>('reciente');
-
-	let animals = $state<Animal[]>([]);
-	let photoMap = $state(new Map<string, string>());
-	let missingInfo = $state<MissingAnimalInfo>({ missingIds: new Set(), lastSeenMap: new Map() });
-
-	async function loadData() {
-		const [allAnimals, allPhotos, missing] = await Promise.all([
-			db.animals.where('deleted').equals(0).toArray(),
-			db.photos.toArray(),
-			computeMissingAnimals()
-		]);
-
-		const pMap = new Map<string, string>();
-		for (const animal of allAnimals) {
-			if (animal.foto_url) {
-				pMap.set(animal.animal_id, animal.foto_url);
-			}
-		}
-		for (const p of allPhotos) {
-			if (p.deleted === 0) pMap.set(p.animal_id, p.data_url || p.drive_url);
-		}
-		photoMap = pMap;
-		missingInfo = missing;
-
-		const normalizedSearch = search.toLowerCase();
-		const aliveAnimals = allAnimals.filter((a) => a.estado === 'Vivo(a)');
-		const filtered = aliveAnimals.filter((a) => {
-			const nombre = String(a.nombre ?? '').toLowerCase();
-			const areteId = String(a.arete_id ?? '').toLowerCase();
-			const matchSearch = !normalizedSearch || nombre.includes(normalizedSearch) || areteId.includes(normalizedSearch);
-			const matchTipo = !filterTipo || a.tipo === filterTipo;
-			return matchSearch && matchTipo;
+	// Filters live in the URL so browser back restores them along with the page.
+	// Writes replace the current entry — back should leave the list, not walk
+	// through every filter the user tried.
+	function setParam(key: string, value: string) {
+		const params = new URLSearchParams(page.url.searchParams);
+		if (value) params.set(key, value);
+		else params.delete(key);
+		const query = params.toString();
+		void replaceWith(query ? `/ganado?${query}` : '/ganado', {
+			noScroll: true,
+			keepFocus: true
 		});
-
-		filtered.sort((a, b) => {
-			switch (sortBy) {
-				case 'nombre_asc': return String(a.nombre ?? '').localeCompare(String(b.nombre ?? ''), 'es');
-				case 'nombre_desc': return String(b.nombre ?? '').localeCompare(String(a.nombre ?? ''), 'es');
-				case 'reciente': return String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''));
-				case 'antiguo': return String(a.created_at ?? '').localeCompare(String(b.created_at ?? ''));
-				case 'edad_desc': return String(a.fecha_nacimiento ?? '').localeCompare(String(b.fecha_nacimiento ?? ''));
-				case 'edad_asc': return String(b.fecha_nacimiento ?? '').localeCompare(String(a.fecha_nacimiento ?? ''));
-				default: return 0;
-			}
-		});
-
-		animals = filtered;
 	}
 
+	// The input stays local so typing feels instant; the URL catches up after a pause.
+	let searchInput = $state(untrack(() => data.search));
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function onSearch(value: string) {
+		searchInput = value;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => setParam('q', value), 300);
+	}
+
+	// Keep the box in sync when the URL itself changes (back/forward), without
+	// clobbering what the user is mid-way through typing.
+	let lastSearchFromUrl = untrack(() => data.search);
 	$effect(() => {
-		// Re-run when search, filter, or sort changes
-		void search;
-		void filterTipo;
-		void sortBy;
-		loadData();
-		const handler = () => loadData();
+		if (data.search !== lastSearchFromUrl) {
+			lastSearchFromUrl = data.search;
+			searchInput = data.search;
+		}
+	});
+
+	onMount(() => {
+		const handler = () => invalidateAll();
 		window.addEventListener('sync-complete', handler);
-		return () => window.removeEventListener('sync-complete', handler);
+		return () => {
+			clearTimeout(searchTimer);
+			window.removeEventListener('sync-complete', handler);
+		};
 	});
 </script>
 
@@ -109,13 +89,13 @@
 		</div>
 	</div>
 
-	<SearchBar value={search} onchange={(v) => (search = v)} />
+	<SearchBar value={searchInput} onchange={onSearch} />
 
 	<div class="flex items-center gap-2">
 		<ArrowUpDown size={14} class="shrink-0 text-gray-400" />
 		<select
 			value={sortBy}
-			onchange={(e) => (sortBy = e.currentTarget.value as SortOption)}
+			onchange={(e) => setParam('sort', e.currentTarget.value === DEFAULT_SORT ? '' : e.currentTarget.value)}
 			class="flex-1 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-green-500"
 		>
 			{#each Object.entries(SORT_LABELS) as [value, label]}
@@ -126,7 +106,7 @@
 
 	<div class="flex gap-2 overflow-x-auto pb-1">
 		<button
-			onclick={() => (filterTipo = '')}
+			onclick={() => setParam('tipo', '')}
 			class="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors {filterTipo === ''
 				? 'bg-green-600 text-white'
 				: 'bg-gray-200 text-gray-700'}"
@@ -135,7 +115,7 @@
 		</button>
 		{#each TIPO_FILTERS as tipo}
 			<button
-				onclick={() => (filterTipo = tipo === filterTipo ? '' : tipo)}
+				onclick={() => setParam('tipo', tipo === filterTipo ? '' : tipo)}
 				class="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors {filterTipo ===
 				tipo
 					? 'bg-green-600 text-white'

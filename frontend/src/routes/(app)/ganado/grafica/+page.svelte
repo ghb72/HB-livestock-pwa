@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { replaceWith } from '$lib/navigation.svelte';
 	import { page } from '$app/state';
-	import { ArrowLeft, GitBranch, X } from 'lucide-svelte';
+	import { GitBranch, X } from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { SvelteFlow, Background } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { createGenealogySource, buildFlowLayout } from '$lib/genealogy';
 	import { formatTagId } from '$lib/helpers';
 	import type { Animal, AnimalPhoto, EstadoAnimal, ReproductionRecord } from '$lib/types';
@@ -13,13 +16,16 @@
 
 	const nodeTypes = { genealogy: GenealogyFlowNode };
 
+	const DEPTH_OPTIONS = [1, 2, 3, 4];
+	const DEFAULT_DEPTH = 3;
+
 	let loading = $state(true);
-	let maxDepth = $state(3);
 	let animals = $state<Animal[]>([]);
 	let photos = $state<AnimalPhoto[]>([]);
 	let reproduction = $state<ReproductionRecord[]>([]);
 
 	const selectedAnimalId = $derived(page.url.searchParams.get('animal') ?? '');
+	const maxDepth = $derived(Number(page.url.searchParams.get('depth')) || DEFAULT_DEPTH);
 
 	$effect(() => {
 		loadData();
@@ -30,7 +36,7 @@
 		try {
 			const [allAnimals, allPhotos, allReproduction] = await Promise.all([
 				db.animals.where('deleted').equals(0).toArray(),
-				db.photos.toArray(),
+				getAllPhotos(),
 				db.reproduction.where('deleted').equals(0).toArray()
 			]);
 			animals = allAnimals;
@@ -47,17 +53,24 @@
 		selectedAnimalId ? source.animalsById.get(selectedAnimalId) : undefined
 	);
 
-	function focusAnimal(animalId: string) {
+	/** Filters replace the current entry so back leaves the page, not the last filter. */
+	function setParam(key: string, value: string | null) {
 		const params = new URLSearchParams(page.url.searchParams);
-		params.set('animal', animalId);
-		goto(`/ganado/grafica?${params.toString()}`);
+		if (value === null) params.delete(key);
+		else params.set(key, value);
+		const query = params.toString();
+		void replaceWith(query ? `/ganado/grafica?${query}` : '/ganado/grafica', {
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
+	function focusAnimal(animalId: string) {
+		setParam('animal', animalId);
 	}
 
 	function clearFocus() {
-		const params = new URLSearchParams(page.url.searchParams);
-		params.delete('animal');
-		const query = params.toString();
-		goto(query ? `/ganado/grafica?${query}` : '/ganado/grafica');
+		setParam('animal', null);
 	}
 
 	const flowLayout = $derived(
@@ -69,21 +82,13 @@
 
 	const flowKey = $derived(`${selectedAnimalId}-${maxDepth}`);
 
-	const DEPTH_OPTIONS = [1, 2, 3, 4];
 </script>
 
 <div class="mx-auto max-w-lg space-y-4 p-4">
 	<!-- Encabezado -->
 	<div class="flex items-center justify-between gap-3">
 		<div class="flex items-center gap-3">
-			<button
-				type="button"
-				onclick={() => goto('/ganado')}
-				class="rounded-full p-2 text-gray-600 hover:bg-gray-100"
-				aria-label="Volver"
-			>
-				<ArrowLeft size={22} />
-			</button>
+			<BackButton fallback="/ganado" size={22} />
 			<div>
 				<h2 class="text-xl font-bold text-gray-800">Árbol genealógico</h2>
 				<p class="text-xs text-gray-500">Linea genética de tus reses.</p>
@@ -113,7 +118,7 @@
 				{#each DEPTH_OPTIONS as depth}
 					<button
 						type="button"
-						onclick={() => (maxDepth = depth)}
+						onclick={() => setParam('depth', depth === DEFAULT_DEPTH ? null : String(depth))}
 						class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors {maxDepth === depth
 							? 'bg-gray-900 text-white'
 							: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"

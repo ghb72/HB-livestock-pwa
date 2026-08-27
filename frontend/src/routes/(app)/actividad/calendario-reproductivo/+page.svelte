@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		ArrowLeft,
 		AlertTriangle,
 		CheckCircle,
 		Clock,
@@ -8,8 +7,10 @@
 		HelpCircle,
 		ChevronDown,
 		ChevronUp,
-		Baby
+		Baby,
+		Pencil
 	} from 'lucide-svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import {
 		differenceInDays,
 		addMonths,
@@ -20,13 +21,31 @@
 	} from 'date-fns';
 	import { es } from 'date-fns/locale';
 	import { db } from '$lib/db';
+	import { getAllPhotos } from '$lib/store';
 	import { formatStoredDate, todayLocalDate } from '$lib/date';
 	import { formatTagId } from '$lib/helpers';
+	import {
+		applyMontaReconciliation,
+		birthsByCow,
+		calvingIntervals,
+		planMontaReconciliation,
+		BREEDING_AGE_YEARS,
+		GESTATION_DAYS,
+		RECENT_INTERVALS,
+		type BirthEvent,
+		type MontaCorrection,
+		type PrenezRevocation
+	} from '$lib/reproduction';
 	import type { Animal, ReproductionRecord } from '$lib/types';
 
 	// ── Constants ──
-	const GESTATION_DAYS = 283;
 	const RECENT_BIRTH_DAYS = 60;
+	/**
+	 * A cow sold this soon after her last calving was still productive when she
+	 * left, so her intervals describe the herd's current performance. Sold longer
+	 * ago than this, she was already out of the reproductive cycle.
+	 */
+	const SOLD_COW_HISTORY_DAYS = 365;
 	const OPEN_ALERT_DAYS = 170;
 	const WEANING_WINDOW_START_DAYS = 115;
 	const WEANING_WINDOW_END_DAYS = 160;
@@ -49,12 +68,40 @@
 		nextExpectedParto: string | null;
 		daysOpen: number | null;
 		records: ReproductionRecord[];
+		births: BirthEvent[];
 	}
 
 	type CowStatusBase = Omit<
 		CowStatus,
-		'cow' | 'records' | 'lastCalfBirthDate' | 'lastBirthReferenceDate' | 'daysSinceLastBirth'
+		| 'cow'
+		| 'records'
+		| 'births'
+		| 'lastCalfBirthDate'
+		| 'lastBirthReferenceDate'
+		| 'daysSinceLastBirth'
 	>;
+
+	/**
+	 * Anything that can contribute calving intervals to the herd IEP. Cows on the
+	 * page are one source; cows sold while still productive are the other, and
+	 * they have no status of their own.
+	 */
+	interface IEPSubject {
+		births: BirthEvent[];
+		nextExpectedParto: string | null;
+		ageYears: number | null;
+	}
+
+	interface IEPResult {
+		/** Days, from her most recent intervals — or projected when she has none. */
+		days: number | null;
+		/** True when `days` comes from an expected birth rather than two real calvings. */
+		projected: boolean;
+		/** Mean over every interval of her life; null below two calvings. */
+		lifetime: number | null;
+		/** Why there is no value at all, phrased for the card. */
+		reason: string;
+	}
 
 	interface HerdKPIs {
 		totalCows: number;
@@ -65,7 +112,13 @@
 		recentBirth: number;
 		noHistory: number;
 		avgIEP: number | null;
+		avgIEPProjected: boolean;
+		avgIEPLifetime: number | null;
+		/** Cows the average is actually built from, and how many could contribute. */
+		iepCows: number;
+		iepEligible: number;
 		birthRate12m: number | null;
+		breedingCows: number;
 	}
 
 	// ── Helpers ──
@@ -85,12 +138,6 @@
 		return differenceInDays(new Date(), d) / 365.25;
 	}
 
-	function latestDateString(...dateStrings: Array<string | null | undefined>): string | null {
-		const validDates = dateStrings.filter((dateStr): dateStr is string => !!safeDate(dateStr));
-		if (validDates.length === 0) return null;
-		return validDates.sort((a, b) => b.localeCompare(a))[0] ?? null;
-	}
-
 	function daysSince(dateStr: string | null | undefined, today: Date): number | null {
 		const d = safeDate(dateStr);
 		if (!d) return null;
@@ -106,10 +153,19 @@
 	}
 
 	function inferSemaforo(
-		records: ReproductionRecord[],
-		today: Date
+		allRecords: ReproductionRecord[],
+		today: Date,
+		archived: ReadonlyMap<string, string>,
+		births: BirthEvent[]
 	): CowStatusBase {
-		if (records.length === 0) {
+		// A monta contradicted by a birth never happened as recorded, so it must not
+		// become the cow's last monta nor drive her expected birth. Neither may a
+		// mating whose pregnancy was explicitly ruled out.
+		const records = allRecords.filter(
+			(r) => !archived.has(r.reproduccion_id) && r.prenez_confirmada !== 'No'
+		);
+
+		if (records.length === 0 && births.length === 0) {
 			return {
 				semaforo: 'gris',
 				semaforoLabel: 'Sin historial',
@@ -124,19 +180,19 @@
 			(b.fecha_monta || '').localeCompare(a.fecha_monta || '')
 		);
 
-		const partosDesc = [...records]
-			.filter((r) => !!r.fecha_parto_real)
-			.sort((a, b) => b.fecha_parto_real.localeCompare(a.fecha_parto_real));
+		// Calvings come from both tables — see birthsByCow. Reading only the
+		// reproduction records here is what let a birth registered as a calf leave a
+		// stale mating in charge of the cow's status.
+		const partosDesc = [...births].sort((a, b) => b.date.localeCompare(a.date));
 
-		const lastParto = partosDesc[0] ?? null;
-		const lastPartoDate = lastParto?.fecha_parto_real ?? null;
+		const lastPartoDate = partosDesc[0]?.date ?? null;
 		const lastPartoDateObj = safeDate(lastPartoDate);
 
 		const lastMontaRecord = sorted.find((r) => {
 			const montaDate = safeDate(r.fecha_monta);
 			if (!montaDate) return false;
 			return !partosDesc.some((p) => {
-				const pd = safeDate(p.fecha_parto_real);
+				const pd = safeDate(p.date);
 				return pd && pd > montaDate;
 			});
 		});
@@ -228,27 +284,58 @@
 		};
 	}
 
-	function calcIEP(records: ReproductionRecord[]): number | null {
-		const partos = records
-			.filter((r) => !!r.fecha_parto_real)
-			.map((r) => r.fecha_parto_real)
-			.sort();
-		if (partos.length < 2) return null;
-		const intervals: number[] = [];
-		for (let i = 1; i < partos.length; i++) {
-			const d1 = safeDate(partos[i - 1]);
-			const d2 = safeDate(partos[i]);
-			if (d1 && d2) intervals.push(differenceInDays(d2, d1));
-		}
-		if (intervals.length === 0) return null;
-		return Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length);
+	function mean(values: number[]): number | null {
+		if (values.length === 0) return null;
+		return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
 	}
 
-	function calcEfficiency(cow: Animal, records: ReproductionRecord[]): number | null {
+	/**
+	 * A cow's calving interval, reported as two different numbers because they
+	 * answer two different questions: the headline value averages her last
+	 * `RECENT_INTERVALS` intervals and describes how she is cycling now, while
+	 * `lifetime` averages all of them and shows whether management has drifted
+	 * over the years.
+	 *
+	 * Both are means of a single cow's intervals — never of the herd's pooled
+	 * intervals. The number of intervals a cow produces is roughly inversely
+	 * proportional to their length, so pooling would over-weight the fastest
+	 * breeders and bias the herd figure downwards.
+	 *
+	 * With a single calving there is no interval yet, but if she is carrying
+	 * again the interval she is on track for is already known, and reporting it
+	 * as a projection is what lets a young herd see the KPI at all.
+	 */
+	function calcIEP(births: BirthEvent[], nextExpectedParto: string | null): IEPResult {
+		const intervals = calvingIntervals(births);
+
+		if (intervals.length > 0) {
+			return {
+				days: mean(intervals.slice(-RECENT_INTERVALS)),
+				projected: false,
+				lifetime: mean(intervals),
+				reason: ''
+			};
+		}
+
+		const lastBirth = safeDate(births.at(-1)?.date);
+		const expected = safeDate(nextExpectedParto);
+		if (lastBirth && expected) {
+			const days = differenceInDays(expected, lastBirth);
+			if (days > 0) return { days, projected: true, lifetime: null, reason: '' };
+		}
+
+		return {
+			days: null,
+			projected: false,
+			lifetime: null,
+			reason: births.length === 0 ? 'sin partos' : 'falta 2º parto'
+		};
+	}
+
+	function calcEfficiency(cow: Animal, births: BirthEvent[]): number | null {
 		const edad = ageInYears(cow.fecha_nacimiento);
-		if (edad === null || edad <= 2) return null;
-		const totalPartos = records.filter((r) => !!r.fecha_parto_real).length;
-		return totalPartos / (edad - 2);
+		if (edad === null || edad <= BREEDING_AGE_YEARS) return null;
+		return births.length / (edad - BREEDING_AGE_YEARS);
 	}
 
 	const SEMAFORO_CONFIG: Record<Semaforo, { dot: string; badge: string }> = {
@@ -267,8 +354,14 @@
 	let vacantCowsOpen = $state(true);
 	let heatWindowOpen = $state(true);
 	let cowStatuses = $state<CowStatus[]>([]);
+	/** Cows sold while still productive — history only, never shown as herd. */
+	let soldCowHistory = $state<IEPSubject[]>([]);
 	let animalLookup = $state(new Map<string, Animal>());
 	let photoLookup = $state(new Map<string, string>());
+	let archivedMontas = $state(new Map<string, string>());
+	let montaCorrections = $state<MontaCorrection[]>([]);
+	let prenezRevocations = $state<PrenezRevocation[]>([]);
+	let correctionsNoticeOpen = $state(true);
 
 	const today = new Date();
 
@@ -309,22 +402,40 @@
 		const vacant = vacantCows.length;
 		const nearWeaning = nearWeaningCows.length;
 		const recent = cowStatuses.filter((c) => c.semaforo === 'verde').length;
-		const noHist = cowStatuses.filter((c) => c.records.length === 0).length;
+		// A heifer that has never calved is not a gap in the records, so she does not
+		// belong in either the "sin historial" count or the birth-rate denominator.
+		const isBreedingAge = (age: number | null) => age !== null && age >= BREEDING_AGE_YEARS;
+		const breedingCows = cowStatuses.filter((c) =>
+			isBreedingAge(ageInYears(c.cow.fecha_nacimiento))
+		);
+		const noHist = breedingCows.filter(
+			(c) => c.records.length === 0 && c.births.length === 0
+		).length;
 
-		const iepValues = cowStatuses
-			.map((c) => calcIEP(c.records))
-			.filter((v): v is number => v !== null);
-		const avgIEP =
-			iepValues.length > 0
-				? Math.round(iepValues.reduce((a, b) => a + b, 0) / iepValues.length)
-				: null;
+		const subjects: IEPSubject[] = [
+			...cowStatuses.map((c) => ({
+				births: c.births,
+				nextExpectedParto: c.nextExpectedParto,
+				ageYears: ageInYears(c.cow.fecha_nacimiento)
+			})),
+			...soldCowHistory
+		].filter((subject) => isBreedingAge(subject.ageYears));
+
+		const results = subjects.map((s) => calcIEP(s.births, s.nextExpectedParto));
+		const measured = results.filter((r) => !r.projected && r.days !== null).map((r) => r.days!);
+		const projected = results.filter((r) => r.projected && r.days !== null).map((r) => r.days!);
+
+		// Measured and projected are never mixed into one number: the herd falls back
+		// to projections only while no real interval exists anywhere, and says so.
+		const avgIEP = measured.length > 0 ? mean(measured) : mean(projected);
+		const avgIEPProjected = measured.length === 0 && projected.length > 0;
 
 		const cutoff = format(subMonths(today, 12), 'yyyy-MM-dd');
-		const allRecords = cowStatuses.flatMap((c) => c.records);
-		const births12m = allRecords.filter(
-			(r) => r.fecha_parto_real && r.fecha_parto_real >= cutoff
-		).length;
-		const birthRate12m = total > 0 ? Math.round((births12m / total) * 100) : null;
+		const births12m = cowStatuses
+			.flatMap((c) => c.births)
+			.filter((b) => b.date >= cutoff).length;
+		const birthRate12m =
+			breedingCows.length > 0 ? Math.round((births12m / breedingCows.length) * 100) : null;
 
 		return {
 			totalCows: total,
@@ -335,7 +446,12 @@
 			recentBirth: recent,
 			noHistory: noHist,
 			avgIEP,
-			birthRate12m
+			avgIEPProjected,
+			avgIEPLifetime: mean(results.map((r) => r.lifetime).filter((v): v is number => v !== null)),
+			iepCows: measured.length,
+			iepEligible: subjects.length,
+			birthRate12m,
+			breedingCows: breedingCows.length
 		};
 	});
 
@@ -358,18 +474,18 @@
 	let selectedStatus = $derived(
 		cowStatuses.find((c) => c.cow.animal_id === selectedCowId) ?? null
 	);
-	let selectedIEP = $derived(selectedStatus ? calcIEP(selectedStatus.records) : null);
+	let selectedIEP = $derived(
+		selectedStatus
+			? calcIEP(selectedStatus.births, selectedStatus.nextExpectedParto)
+			: null
+	);
 	let selectedEff = $derived(
-		selectedStatus ? calcEfficiency(selectedStatus.cow, selectedStatus.records) : null
+		selectedStatus ? calcEfficiency(selectedStatus.cow, selectedStatus.births) : null
 	);
 	let selectedAge = $derived(
 		selectedStatus ? ageInYears(selectedStatus.cow.fecha_nacimiento) : null
 	);
-	let selectedPartos = $derived(
-		selectedStatus
-			? selectedStatus.records.filter((r) => !!r.fecha_parto_real).length
-			: 0
-	);
+	let selectedPartos = $derived(selectedStatus ? selectedStatus.births.length : 0);
 
 	let shouldCull = $derived(selectedEff !== null && selectedEff < CULL_EFFICIENCY);
 
@@ -381,20 +497,33 @@
 					? `${selectedStatus?.daysOpen}d`
 					: '—',
 			sub: '',
+			note: '',
 			warn:
 				selectedStatus?.daysOpen !== null &&
 				(selectedStatus?.daysOpen ?? 0) > OPEN_ALERT_DAYS
 		},
 		{
 			label: 'IEP',
-			value: selectedIEP !== null ? `${selectedIEP}d` : '—',
-			sub: selectedIEP !== null ? `${(selectedIEP / 30.4).toFixed(1)} m` : '',
-			warn: selectedIEP !== null && selectedIEP > 450
+			value:
+				selectedIEP?.days != null ? `${selectedIEP.projected ? '~' : ''}${selectedIEP.days}d` : '—',
+			sub:
+				selectedIEP?.days == null
+					? (selectedIEP?.reason ?? '')
+					: selectedIEP.projected
+						? 'proyectado'
+						: `${(selectedIEP.days / 30.4).toFixed(1)} m`,
+			// The lifetime mean only earns space when it disagrees with the recent one.
+			note:
+				selectedIEP?.lifetime != null && selectedIEP.lifetime !== selectedIEP.days
+					? `vitalicio ${selectedIEP.lifetime}d`
+					: '',
+			warn: selectedIEP?.days != null && !selectedIEP.projected && selectedIEP.days > 450
 		},
 		{
 			label: 'Total crías',
 			value: `${selectedPartos}`,
 			sub: '',
+			note: '',
 			warn: false
 		},
 		{
@@ -402,10 +531,11 @@
 			value:
 				selectedEff !== null
 					? selectedEff.toFixed(2)
-					: selectedAge !== null && selectedAge <= 2
+					: selectedAge !== null && selectedAge <= BREEDING_AGE_YEARS
 						? 'joven'
 						: '—',
 			sub: selectedAge !== null ? `${selectedAge.toFixed(1)} años` : '',
+			note: '',
 			warn: shouldCull
 		}
 	]);
@@ -415,13 +545,28 @@
 	});
 
 	async function loadData() {
-		const [animals, reproRecords, photos] = await Promise.all([
+		const [animals, storedRepro, photos, sales] = await Promise.all([
 			db.animals.toArray(),
 			db.reproduction.where('deleted').equals(0).toArray(),
-			db.photos.toArray()
+			getAllPhotos(),
+			db.sales.where('deleted').equals(0).toArray()
 		]);
 
 		const activeAnimals = animals.filter((animal) => animal.deleted === 0);
+
+		// Reconcile before anything is computed: a mating observation contradicted by
+		// a real birth would otherwise drive the whole page's inference.
+		const plan = planMontaReconciliation(storedRepro, activeAnimals);
+		let reproRecords = storedRepro;
+		if (plan.corrections.length > 0 || plan.revocations.length > 0) {
+			await applyMontaReconciliation(plan);
+			reproRecords = await db.reproduction.where('deleted').equals(0).toArray();
+		}
+		montaCorrections = plan.corrections;
+		prenezRevocations = plan.revocations;
+		correctionsNoticeOpen = plan.corrections.length > 0 || plan.revocations.length > 0;
+		archivedMontas = plan.archived;
+
 		animalLookup = new Map(activeAnimals.map((animal) => [animal.animal_id, animal]));
 		const nextPhotoLookup = new Map<string, string>();
 		for (const animal of activeAnimals) {
@@ -431,18 +576,15 @@
 		}
 		for (const photo of photos) {
 			if (photo.deleted === 0) {
-				nextPhotoLookup.set(photo.animal_id, photo.data_url || photo.drive_url);
+				nextPhotoLookup.set(photo.animal_id, photo.data_url || photo.photo_url);
 			}
 		}
 		photoLookup = nextPhotoLookup;
-		const latestCalfBirthByMother = new Map<string, string>();
-		for (const animal of activeAnimals) {
-			const motherId = animal.madre_id?.trim();
-			if (!motherId || !animal.fecha_nacimiento) continue;
-			const currentLatest = latestCalfBirthByMother.get(motherId) ?? null;
-			const latestBirth = latestDateString(currentLatest, animal.fecha_nacimiento);
-			if (latestBirth) latestCalfBirthByMother.set(motherId, latestBirth);
-		}
+
+		// One deduplicated view of every calving, merging birth events and calves
+		// registered under a mother. Replaces the partial calf-only index this page
+		// used to build by hand, and now also feeds the semáforo and the KPIs.
+		const allBirths = birthsByCow(reproRecords, activeAnimals);
 
 		const cows = activeAnimals.filter(
 			(a) => a.sexo === 'Hembra' && a.estado !== 'Vendido(a)' && a.estado !== 'Muerto(a)'
@@ -450,21 +592,46 @@
 
 		cowStatuses = cows.map((cow) => {
 			const records = reproRecords.filter((r) => r.vaca_id === cow.animal_id);
-			const inferredStatus = inferSemaforo(records, today);
-			const lastCalfBirthDate = latestCalfBirthByMother.get(cow.animal_id) ?? null;
-			const lastBirthReferenceDate = latestDateString(
-				inferredStatus.lastPartoDate,
-				lastCalfBirthDate
-			);
+			const births = allBirths.get(cow.animal_id) ?? [];
+			const inferredStatus = inferSemaforo(records, today, plan.archived, births);
+			const lastCalfBirthDate = births.filter((b) => !b.fromRecord).at(-1)?.date ?? null;
+			const lastBirthReferenceDate = births.at(-1)?.date ?? null;
 			return {
 				cow,
 				records,
+				births,
 				...inferredStatus,
 				lastCalfBirthDate,
 				lastBirthReferenceDate,
 				daysSinceLastBirth: daysSince(lastBirthReferenceDate, today)
 			};
 		});
+
+		// A cow sold soon after calving was still in the cycle when she left, so
+		// dropping her intervals would throw away the herd's recent history — which,
+		// in a herd whose older cows have been sold, may be all of it. She feeds the
+		// IEP only; she is never part of the herd shown on screen.
+		const lastSaleDate = new Map<string, string>();
+		for (const sale of sales) {
+			const previous = lastSaleDate.get(sale.animal_id);
+			if (!previous || sale.fecha_venta > previous) {
+				lastSaleDate.set(sale.animal_id, sale.fecha_venta);
+			}
+		}
+
+		soldCowHistory = activeAnimals
+			.filter((animal) => animal.sexo === 'Hembra' && animal.estado === 'Vendido(a)')
+			.flatMap((animal): IEPSubject[] => {
+				const births = allBirths.get(animal.animal_id) ?? [];
+				const lastBirth = safeDate(births.at(-1)?.date);
+				const sold = safeDate(lastSaleDate.get(animal.animal_id));
+				if (!lastBirth || !sold) return [];
+				const gap = differenceInDays(sold, lastBirth);
+				if (gap < 0 || gap >= SOLD_COW_HISTORY_DAYS) return [];
+				return [
+					{ births, nextExpectedParto: null, ageYears: ageInYears(animal.fecha_nacimiento) }
+				];
+			});
 	}
 
 	function formatD(dateStr: string | null | undefined): string {
@@ -488,10 +655,10 @@
 		selectedCowId = selectedCowId === cowId ? null : cowId;
 	}
 
-	function calfLabel(calfId: string): string {
-		const calf = animalLookup.get(calfId);
-		if (!calf) return calfId;
-		return `${calf.nombre || 'Sin nombre'} ${formatTagId(calf.arete_id)}`.trim();
+	function animalLabel(animalId: string): string {
+		const animal = animalLookup.get(animalId);
+		if (!animal) return animalId;
+		return `${animal.nombre || 'Sin nombre'} ${formatTagId(animal.arete_id)}`.trim();
 	}
 
 	function calfPhotoSrc(calfId: string): string {
@@ -503,51 +670,67 @@
 			label: 'Gestando confirmada',
 			value: `${herdKPIs.gestatingConfirmed}`,
 			sub: `${herdKPIs.totalCows > 0 ? Math.round((herdKPIs.gestatingConfirmed / herdKPIs.totalCows) * 100) : 0}%`,
+			note: '',
 			color: 'border-blue-200 bg-blue-50 text-blue-700'
 		},
 		{
 			label: 'Gestación probable',
 			value: `${herdKPIs.gestatingProbable}`,
 			sub: 'inferida',
+			note: '',
 			color: 'border-yellow-200 bg-yellow-50 text-yellow-700'
 		},
 		{
 			label: 'Vacías / alerta',
 			value: `${herdKPIs.vacant}`,
 			sub: `${herdKPIs.totalCows > 0 ? Math.round((herdKPIs.vacant / herdKPIs.totalCows) * 100) : 0}%`,
+			note: '',
 			color: 'border-red-200 bg-red-50 text-red-700'
 		},
 		{
 			label: 'Próximas a destetar',
 			value: `${herdKPIs.nearWeaning}`,
 			sub: `${WEANING_WINDOW_START_DAYS}-${WEANING_WINDOW_END_DAYS}d posparto`,
+			note: '',
 			color: 'border-amber-200 bg-amber-50 text-amber-700'
 		},
 		{
 			label: 'Recién paridas',
 			value: `${herdKPIs.recentBirth}`,
 			sub: `≤${RECENT_BIRTH_DAYS}d`,
+			note: '',
 			color: 'border-green-200 bg-green-50 text-green-700'
 		},
 		{
 			label: 'Sin historial',
 			value: `${herdKPIs.noHistory}`,
-			sub: 'sin registros reproductivos',
+			sub: `de ${herdKPIs.breedingCows} adultas`,
 			color: 'border-slate-200 bg-slate-50 text-slate-700'
 		},
 		{
-			label: 'IEP promedio',
-			value: herdKPIs.avgIEP !== null ? `${herdKPIs.avgIEP}d` : '—',
-			sub:
+			label: `IEP promedio (últimos ${RECENT_INTERVALS})`,
+			value:
 				herdKPIs.avgIEP !== null
-					? `${(herdKPIs.avgIEP / 30.4).toFixed(1)} meses`
-					: 'sin datos',
+					? `${herdKPIs.avgIEPProjected ? '~' : ''}${herdKPIs.avgIEP}d`
+					: '—',
+			// A dash has to say whether it is missing data or a broken calculation.
+			sub:
+				herdKPIs.avgIEP === null
+					? `0 de ${herdKPIs.iepEligible} con 2+ partos`
+					: herdKPIs.avgIEPProjected
+						? `proyectado · 0 de ${herdKPIs.iepEligible} con 2+ partos`
+						: `${(herdKPIs.avgIEP / 30.4).toFixed(1)} meses · ${herdKPIs.iepCows} de ${herdKPIs.iepEligible}`,
+			note:
+				herdKPIs.avgIEPLifetime !== null && herdKPIs.avgIEPLifetime !== herdKPIs.avgIEP
+					? `vitalicio ${herdKPIs.avgIEPLifetime}d`
+					: '',
 			color: 'border-gray-200 bg-gray-50 text-gray-700'
 		},
 		{
 			label: 'Tasa de parto 12m',
 			value: herdKPIs.birthRate12m !== null ? `${herdKPIs.birthRate12m}%` : '—',
-			sub: 'partos / vacas',
+			sub: `partos / ${herdKPIs.breedingCows} adultas`,
+			note: '',
 			color: 'border-gray-200 bg-gray-50 text-gray-700'
 		}
 	]);
@@ -556,18 +739,79 @@
 <div class="mx-auto max-w-lg space-y-5 pb-8">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<button
-			onclick={() => history.back()}
-			class="rounded-full p-2 text-gray-600 hover:bg-gray-200"
-			aria-label="Volver"
-		>
-			<ArrowLeft size={24} />
-		</button>
+		<BackButton fallback="/actividad" />
 		<div>
 			<h2 class="text-xl font-bold text-gray-800">Inteligencia Reproductiva</h2>
 			<p class="text-xs text-gray-400">Solo lectura — datos calculados</p>
 		</div>
 	</div>
+
+	<!-- Automatic reconciliation of physically impossible records -->
+	{#if correctionsNoticeOpen && (montaCorrections.length > 0 || prenezRevocations.length > 0)}
+		<section class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+			<div class="flex items-start justify-between gap-3">
+				<p class="text-sm font-bold text-sky-800">
+					{montaCorrections.length + prenezRevocations.length}
+					{montaCorrections.length + prenezRevocations.length === 1
+						? 'registro corregido automáticamente'
+						: 'registros corregidos automáticamente'}
+				</p>
+				<button
+					type="button"
+					onclick={() => (correctionsNoticeOpen = false)}
+					class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+				>
+					Cerrar
+				</button>
+			</div>
+
+			{#if montaCorrections.length > 0}
+				<p class="mt-2 text-xs text-sky-700/80">
+					La vaca ya había parido antes del parto inferido, así que la monta se recorrió a {GESTATION_DAYS}
+					días antes del parto real.
+				</p>
+				<ul class="mt-1 space-y-1">
+					{#each montaCorrections as correction (correction.reproduccion_id)}
+						<li class="text-sm text-sky-950">
+							<a
+								href="/actividad/reproduccion/{correction.reproduccion_id}"
+								class="font-medium underline decoration-sky-300 underline-offset-2"
+							>
+								{animalLabel(correction.vaca_id)}
+							</a>
+							: {formatD(correction.previousMontaDate)} → {formatD(correction.correctedMontaDate)}
+							<span class="text-xs text-sky-700/80">
+								(parto {formatD(correction.birthDate)})
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if prenezRevocations.length > 0}
+				<p class="mt-2 text-xs text-sky-700/80">
+					Se volvió a montar la vaca dentro de la gestación que estos registros afirmaban, así que
+					la preñez confirmada pasó a «No». Revisa si hubo aborto o pérdida.
+				</p>
+				<ul class="mt-1 space-y-1">
+					{#each prenezRevocations as revocation (revocation.reproduccion_id)}
+						<li class="text-sm text-sky-950">
+							<a
+								href="/actividad/reproduccion/{revocation.reproduccion_id}"
+								class="font-medium underline decoration-sky-300 underline-offset-2"
+							>
+								{animalLabel(revocation.vaca_id)}
+							</a>
+							: monta {formatD(revocation.montaDate)} → preñez «No»
+							<span class="text-xs text-sky-700/80">
+								(montada de nuevo el {formatD(revocation.laterMontaDate)})
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+	{/if}
 
 	<!-- Horizon selector -->
 	<div class="flex items-center gap-2">
@@ -664,6 +908,9 @@
 				<div class="rounded-xl border p-3 {kpi.color}">
 					<p class="text-2xl font-bold">{kpi.value}</p>
 					<p class="text-xs font-medium opacity-80">{kpi.sub}</p>
+					{#if kpi.note}
+						<p class="text-[10px] leading-tight opacity-60">{kpi.note}</p>
+					{/if}
 					<p class="mt-1 text-xs leading-tight opacity-60">{kpi.label}</p>
 				</div>
 			{/each}
@@ -922,6 +1169,9 @@
 											{#if mk.sub}
 												<p class="text-xs text-gray-400">{mk.sub}</p>
 											{/if}
+											{#if mk.note}
+												<p class="text-[10px] leading-tight text-gray-400">{mk.note}</p>
+											{/if}
 											<p class="text-xs leading-tight text-gray-500">{mk.label}</p>
 										</div>
 									{/each}
@@ -976,9 +1226,30 @@
 												</thead>
 												<tbody>
 													{#each sortedHistory as r (r.reproduccion_id)}
+														{@const archivedBirth = archivedMontas.get(r.reproduccion_id)}
 														<tr class="border-b border-gray-50 last:border-b-0">
 															<td class="px-3 py-2 text-gray-700">
-																{formatD(r.fecha_monta)}
+																<span class="flex items-center gap-1.5">
+																	{formatD(r.fecha_monta)}
+																	<a
+																		href="/actividad/reproduccion/{r.reproduccion_id}/editar"
+																		class="shrink-0 rounded-full p-1 text-pink-600 transition-colors hover:bg-pink-100"
+																		aria-label="Editar registro del {formatD(r.fecha_monta)}"
+																		title="Editar — confirmar preñez, registrar parto"
+																	>
+																		<Pencil size={13} />
+																	</a>
+																</span>
+																{#if archivedBirth}
+																	<span
+																		class="mt-1 block w-fit rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
+																	>
+																		Archivada
+																	</span>
+																	<span class="mt-0.5 block text-xs text-gray-400">
+																		parto el {formatD(archivedBirth)}
+																	</span>
+																{/if}
 															</td>
 															<td class="px-3 py-2 font-medium text-gray-800">
 																{r.fecha_parto_real
@@ -1004,7 +1275,7 @@
 																		<a href="/ganado/{r.cria_id}" class="block w-fit">
 																			<img
 																				src={calfPhotoSrc(r.cria_id)}
-																				alt={calfLabel(r.cria_id)}
+																				alt={animalLabel(r.cria_id)}
 																				class="h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
 																			/>
 																		</a>
@@ -1013,7 +1284,7 @@
 																		href="/ganado/{r.cria_id}"
 																		class="font-medium text-pink-700 underline decoration-pink-200 underline-offset-2 transition-colors hover:text-pink-800"
 																	>
-																		{calfLabel(r.cria_id)}
+																		{animalLabel(r.cria_id)}
 																	</a>
 																</div>
 															{:else}

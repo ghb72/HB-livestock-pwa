@@ -124,7 +124,7 @@ export async function apiPullAll(): Promise<PullResponse> {
 interface UploadedPhoto {
 	photo_id: string;
 	animal_id: string;
-	drive_url: string;
+	photo_url: string;
 }
 
 interface PhotoUploadError {
@@ -138,5 +138,12 @@ export async function apiUploadPhotos(
 	return request<{ uploaded: UploadedPhoto[]; errors: PhotoUploadError[] }>('/api/photos/upload/batch', {
 		method: 'POST',
 		body: JSON.stringify({ photos })
+	});
+}
+
+export async function apiDeletePhoto(photoId: string, photoUrl: string): Promise<void> {
+	const query = new URLSearchParams({ photo_url: photoUrl });
+	await request<void>(`/api/photos/${encodeURIComponent(photoId)}?${query}`, {
+		method: 'DELETE'
 	});
 }
